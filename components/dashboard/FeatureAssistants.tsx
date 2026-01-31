@@ -7,9 +7,12 @@ import UserInputDilaog from "./UserInputDilaog";
 import ProfileDialog from "./ProfileDialog";
 import { useContext } from "react";
 import { UserContext } from "@/app/context/UserContext";
+import { useRouter } from "next/navigation";
 
 const FeatureAssistants = () => {
   const { userData } = useContext(UserContext) ?? {};
+
+  const router = useRouter();
 
   return (
     <section className="space-y-2">
@@ -35,32 +38,34 @@ const FeatureAssistants = () => {
 
       {/* Tools Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {CoachingOptions.map((item) => (
-          <UserInputDilaog key={item.name} CoachingOption={item.name}>
+
+
+        {CoachingOptions.map((item) => {
+          const card = (
             <Card
               className="
-          group cursor-pointer
-          rounded-xl border
-          bg-background
-          pt-0 px-5 pb-4
-          transition-all duration-300
-          hover:-translate-y-1
-          hover:border-primary/40
-          hover:shadow-lg
-        "
+        group cursor-pointer
+        rounded-xl border
+        bg-background
+        pt-0 px-5 pb-4
+        transition-all duration-300
+        hover:-translate-y-1
+        hover:border-primary/40
+        hover:shadow-lg
+      "
             >
               <div className="flex flex-col gap-4 justify-center">
                 {/* Icon */}
                 <div
                   className="
-              flex h-50 w-50 items-center justify-center
-              rounded-lg
-              bg-primary/10
-              text-primary
-              overflow-hidden              
-              transition-all duration-300
-              group-hover:bg-primary/20
-            "
+            flex h-50 w-50 items-center justify-center
+            rounded-lg
+            bg-primary/10
+            text-primary
+            overflow-hidden
+            transition-all duration-300
+            group-hover:bg-primary/20
+          "
                 >
                   <div className="h-full w-full flex items-center justify-center">
                     {item.icon}
@@ -72,15 +77,39 @@ const FeatureAssistants = () => {
                   <p className="font-semibold leading-tight">
                     {item.name}
                   </p>
-
                   <p className="text-xs text-muted-foreground">
                     Start a guided session
                   </p>
                 </div>
               </div>
             </Card>
-          </UserInputDilaog>
-        ))}
+          );
+
+          // 🔥 SPECIAL CASE: Q&A → DIRECT REDIRECT
+          if (item.route === "/q-and-a") {
+            return (
+              <div
+                key={item.name}
+                onClick={() => router.push(item.route)}
+              >
+                {card}
+              </div>
+            );
+          }
+
+          // ✅ DEFAULT: OPEN DIALOG
+          return (
+            <UserInputDilaog
+              key={item.name}
+              CoachingOption={item.name}
+              routedetail={item.route}
+            >
+              {card}
+            </UserInputDilaog>
+          );
+        })}
+
+
       </div>
 
 

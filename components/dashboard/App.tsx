@@ -36,6 +36,8 @@ interface DiscussionRoom {
   userId: string;
 }
 
+type SessionPhase = "idle" | "intro" | "listening_intro" | "mock";
+
 function App({ roomId }: { roomId: string }) {
   const [expert, setExpert] = useState<CoachingExpert | undefined>(undefined);
   const [DiscussionRoomData, setDiscussionRoomData] =
@@ -118,6 +120,10 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
   const bufferInterval = useRef<NodeJS.Timeout | null>(null);
   const [enableFeedback, setEnableFeedback] = useState<boolean>(false);
 
+
+  const [sessionPhase, setSessionPhase] = useState<SessionPhase>("idle");
+
+
   const {
     connection,
     connectToDeepgram,
@@ -134,7 +140,21 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
 
   async function handleConnect() {
     await setupMicrophone();
+
+    const username = userData?.name || "there";
+    const introText = `       Hi ${username}, How can I help you today?.`;
+
+    // Add assistant message to chat
+    setConversation((prev) => [
+      ...prev,
+      { role: "assistant", content: introText },
+    ]);
+ 
+    await speakText(introText, DiscussionRoomData?.expertName || "Female");
+ 
+    setSessionPhase("listening_intro");
   }
+
 
   async function handleDisconnect() {
     console.log("🚫 Disconnecting...");
@@ -179,9 +199,9 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
         (prev) =>
           prev
             ? {
-                ...prev,
-                credits: newCredits,
-              }
+              ...prev,
+              credits: newCredits,
+            }
             : undefined, // In case `prev` was undefined, keep it that way
       );
       console.log(`Deducted ${tokenCount} tokens. Remaining: ${newCredits}`);

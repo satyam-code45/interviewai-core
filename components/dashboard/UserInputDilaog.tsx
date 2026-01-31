@@ -20,9 +20,11 @@ import { UserContext } from "@/app/context/UserContext";
 function UserInputDialog({
   children,
   CoachingOption,
+  routedetail,
 }: {
   children: React.ReactNode;
   CoachingOption: string;
+  routedetail:string;
 }) {
   const [selectedExpert, setSelectedExpert] = useState("");
   const [topic, setTopic] = useState("");
@@ -68,7 +70,8 @@ function UserInputDialog({
 
       // Navigate to the discussion room
       console.log("🚀 Navigating to:", `/discussion-room/${result.id}`);
-      router.push(`/discussion-room/${result.id}`);
+      router.push(`${routedetail}/${result.id}`);
+
     } catch (error) {
       console.error("❌ Error creating discussion room:", error);
       alert("Failed to create discussion room. Please try again.");

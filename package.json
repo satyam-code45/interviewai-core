@@ -18,7 +18,7 @@
     "@radix-ui/react-label": "^2.1.2",
     "@radix-ui/react-progress": "^1.1.2",
     "@radix-ui/react-separator": "^1.1.2",
-    "@radix-ui/react-slot": "^1.1.2",
+    "@radix-ui/react-slot": "^1.2.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.485.0",
@@ -33,7 +33,6 @@
     "tailwind-merge": "^3.0.2"
   },
   "devDependencies": {
-    "prisma": "6.18.0",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -42,6 +41,7 @@
     "@types/recordrtc": "^5.6.14",
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
+    "prisma": "6.18.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
