@@ -1,61 +1,90 @@
 "use client";
 import { CoachingOptions } from "@/utils/Options";
 import { Button } from "../ui/button";
-import { Card, CardContent, CardFooter } from "../ui/card";
+import { Card } from "../ui/card";
 import Image from "next/image";
-import { BlurFade } from "../magicui/blur-fade";
 import UserInputDilaog from "./UserInputDilaog";
 import ProfileDialog from "./ProfileDialog";
 import { useContext } from "react";
 import { UserContext } from "@/app/context/UserContext";
 
 const FeatureAssistants = () => {
-  const context = useContext(UserContext);
-  const userData = context?.userData;
+  const { userData } = useContext(UserContext) ?? {};
 
   return (
-    <div>
+    <section className="space-y-2">
+      {/* Dashboard Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-semibold text-xl text-muted-foreground">
-            My Workspace
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Workspace
           </p>
-          <span className="text-2xl font-bold">
-            Welcome Back,{" "}
-            <span className="text-3xl font-bold text-primary">
-              {userData?.name || "User"}
-            </span>
-          </span>
+          <h1 className="text-3xl font-semibold">
+            Welcome back,{" "}
+            <span className="text-primary">{userData?.name || "User"}</span>
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Select a tool to start a new session
+          </p>
         </div>
-        <div>
-          <ProfileDialog>
-            <Button className="font-bold w-full">Profile</Button>
-          </ProfileDialog>
-        </div>
+
+        <ProfileDialog>
+          <Button variant="outline">Go Back to Dashboard</Button>
+        </ProfileDialog>
       </div>
-      <div className="grid md:grid-cols-3 lg:grid-cols-5 justify-center items-center gap-6 mt-8 p-6">
-        {CoachingOptions.map((item, idx) => (
+
+      {/* Tools Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {CoachingOptions.map((item) => (
           <UserInputDilaog key={item.name} CoachingOption={item.name}>
-            <Card className="flex items-center justify-center">
-              <BlurFade delay={0.25 + idx * 0.05} inView>
-                <CardContent>
-                  <Image
-                    src={item.icon}
-                    alt={item.name}
-                    width={48}
-                    height={48}
-                    className="h-48 w-48 hover:rotate-8 p-9 cursor-pointer transition-all duration-300"
-                  />
-                </CardContent>
-                <CardFooter className="flex justify-center">
-                  <p className="font-bold text-lg text-center ">{item.name}</p>
-                </CardFooter>
-              </BlurFade>
+            <Card
+              className="
+          group cursor-pointer
+          rounded-xl border
+          bg-background
+          pt-0 px-5 pb-4
+          transition-all duration-300
+          hover:-translate-y-1
+          hover:border-primary/40
+          hover:shadow-lg
+        "
+            >
+              <div className="flex flex-col gap-4 justify-center">
+                {/* Icon */}
+                <div
+                  className="
+              flex h-50 w-50 items-center justify-center
+              rounded-lg
+              bg-primary/10
+              text-primary
+              overflow-hidden              
+              transition-all duration-300
+              group-hover:bg-primary/20
+            "
+                >
+                  <div className="h-full w-full flex items-center justify-center">
+                    {item.icon}
+                  </div>
+                </div>
+
+                {/* Text */}
+                <div className="space-y-1">
+                  <p className="font-semibold leading-tight">
+                    {item.name}
+                  </p>
+
+                  <p className="text-xs text-muted-foreground">
+                    Start a guided session
+                  </p>
+                </div>
+              </div>
             </Card>
           </UserInputDilaog>
         ))}
       </div>
-    </div>
+
+
+    </section>
   );
 };
 
