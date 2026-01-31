@@ -23,18 +23,21 @@ interface DiscussionRoom {
 
 function Feedback() {
   const convex = useConvex();
-  const { userData } = useContext(UserContext)!;
+  const context = useContext(UserContext);
+  const userData = context?.userData;
   const [discussionRoomList, setDiscussionRoomList] = useState<
     DiscussionRoom[]
   >([]);
 
   useEffect(() => {
     const GetDiscussionRooms = async () => {
+      if (!userData?._id) return;
+
       const result = await convex.query(
         api.DiscussionRoom.GetAllPreviousDiscussion,
         {
-          uid: userData!._id,
-        }
+          uid: userData._id,
+        },
       );
       console.log(result);
       setDiscussionRoomList(result);

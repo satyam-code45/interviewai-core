@@ -1,4 +1,3 @@
-import { UserButton } from "@stackframe/stack";
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
@@ -18,7 +17,6 @@ function Navbar() {
       </div>
       <div className="flex items-center justify-center gap-6 ">
         <ThemeToggle />
-        <UserButton  />
       </div>
     </header>
   );

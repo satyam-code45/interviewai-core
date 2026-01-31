@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { StackProvider, StackTheme } from "@stackframe/stack";
-import { stackServerApp } from "../stack";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Provider from "./provider";
@@ -37,11 +35,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <StackProvider app={stackServerApp}>
-            <StackTheme>
-              <Provider>{children}</Provider>
-            </StackTheme>
-          </StackProvider>
+          <Provider>{children}</Provider>
         </ThemeProvider>
       </body>
     </html>

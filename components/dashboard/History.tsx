@@ -23,18 +23,21 @@ interface DiscussionRoom {
 
 function History() {
   const convex = useConvex();
-  const { userData } = useContext(UserContext)!;
+  const context = useContext(UserContext);
+  const userData = context?.userData;
   const [discussionRoomList, setDiscussionRoomList] = useState<
     DiscussionRoom[]
   >([]);
 
   useEffect(() => {
     const GetDiscussionRooms = async () => {
+      if (!userData?._id) return;
+
       const result = await convex.query(
         api.DiscussionRoom.GetAllPreviousDiscussion,
         {
-          uid: userData!._id,
-        }
+          uid: userData._id,
+        },
       );
       console.log(result);
       setDiscussionRoomList(result);
@@ -63,7 +66,7 @@ function History() {
           {discussionRoomList.map((item) => (
             <div key={item._id}>
               {["Topic Based Lecture", "Learn Language", "Meditation"].includes(
-                item.coachingOptions
+                item.coachingOptions,
               ) && (
                 <div className="flex justify-between items-center border-b-[1px]  pb-3 mb-4 group cursor-pointer">
                   <div className="flex items-center gap-3 ">

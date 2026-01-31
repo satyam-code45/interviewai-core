@@ -1,15 +1,18 @@
 "use client";
 import { CoachingOptions } from "@/utils/Options";
 import { Button } from "../ui/button";
-import { useUser } from "@stackframe/stack";
 import { Card, CardContent, CardFooter } from "../ui/card";
 import Image from "next/image";
 import { BlurFade } from "../magicui/blur-fade";
 import UserInputDilaog from "./UserInputDilaog";
 import ProfileDialog from "./ProfileDialog";
+import { useContext } from "react";
+import { UserContext } from "@/app/context/UserContext";
 
 const FeatureAssistants = () => {
-  const user = useUser();
+  const context = useContext(UserContext);
+  const userData = context?.userData;
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -20,7 +23,7 @@ const FeatureAssistants = () => {
           <span className="text-2xl font-bold">
             Welcome Back,{" "}
             <span className="text-3xl font-bold text-primary">
-              {user?.displayName}
+              {userData?.name || "User"}
             </span>
           </span>
         </div>

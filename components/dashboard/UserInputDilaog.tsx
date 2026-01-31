@@ -33,15 +33,21 @@ function UserInputDialog({
   const createDiscussionRoom = useMutation(api.DiscussionRoom.CreateNewRoom);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
-  const { userData } = useContext(UserContext)!;
+  const context = useContext(UserContext);
+  const userData = context?.userData;
 
   const onCLickNext = async () => {
+    if (!userData) {
+      console.error("User data not available");
+      return;
+    }
+
     setLoading(true);
     const result = await createDiscussionRoom({
       coachingOptions: CoachingOption,
       expertName: selectedExpert,
       topic: topic,
-      uid: userData!._id,
+      uid: userData._id,
     });
     console.log("onclickNext", result);
     setOpenDialog(false);
