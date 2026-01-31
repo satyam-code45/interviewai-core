@@ -59,14 +59,46 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// export async function PATCH(request: NextRequest) {
+//   try {
+//     const { id, conversation, summary } = await request.json();
+
+//     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+//     const updateData: any = {};
+//     if (conversation !== undefined) updateData.conversation = conversation;
+//     if (summary !== undefined) updateData.summary = summary;
+
+//     const room = await prisma.discussionRoom.update({
+//       where: { id },
+//       data: updateData,
+//     });
+
+//     return NextResponse.json(room);
+//   } catch (error) {
+//     console.error("Error updating discussion room:", error);
+//     return NextResponse.json(
+//       { error: "Failed to update discussion room" },
+//       { status: 500 },
+//     );
+//   }
+// }
+
+
 export async function PATCH(request: NextRequest) {
   try {
     const { id, conversation, summary } = await request.json();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {};
-    if (conversation !== undefined) updateData.conversation = conversation;
-    if (summary !== undefined) updateData.summary = summary;
+
+    if (conversation !== undefined) {
+      updateData.conversation = conversation;
+    }
+
+    if (summary !== undefined) {
+      updateData.summary = {
+        content: summary,
+      };
+    }
 
     const room = await prisma.discussionRoom.update({
       where: { id },

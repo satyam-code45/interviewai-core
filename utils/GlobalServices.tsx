@@ -54,7 +54,9 @@ interface feedback {
 export async function fetchFeedback({
   coachingOption,
   conversation,
-}: feedback): Promise<{ content?: string; error?: string }> {
+}: feedback): Promise<{
+  response: string | undefined; content?: string; error?: string 
+}> {
   try {
     const res = await fetch("/api/openaifeedback", {
       method: "POST",

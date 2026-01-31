@@ -52,7 +52,7 @@ function Feedback() {
                   <div className="flex items-center gap-4">
                     <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-inner">
                       <Image
-                        src={getImage(item.coachingOptions)}
+                        src="/t4.png"
                         alt=""
                         width={56}
                         height={56}

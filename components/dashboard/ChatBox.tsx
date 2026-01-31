@@ -45,12 +45,12 @@ function ChatBox({
   return (
     <div>
       {conversation.length > 0 ? (
-        <div className="bg-gray-100 h-[60vh] bg-fixed dark:bg-gray-700 border rounded-xl flex flex-col p-6 relative overflow-auto scrollbar-hide">
+        <div className="bg-gray-50 h-[60vh] bg-fixed dark:bg-gray-700 border rounded-xl flex flex-col p-6 relative overflow-auto scrollbar-hide">
           {conversation.map((item, index) => (
             <div key={index} className="mt-2 pt-2">
               {item.role === "user" ? (
                 <div className="flex justify-end">
-                  <h2 className=" bg-gray-400 text-black mt-1 py-1 px-3 rounded-lg w-fit ml-9">
+                  <h2 className=" bg-white text-black mt-1 py-1 px-3 rounded-lg w-fit ml-9">
                     {item.content}
                   </h2>
                 </div>

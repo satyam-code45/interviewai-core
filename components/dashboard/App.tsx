@@ -13,7 +13,7 @@ import {
   useMicrophone,
 } from "@/app/context/MicrophoneContextProvider";
 
-import { fetchCoachingResponse } from "@/utils/GlobalServices";
+import { fetchCoachingResponse, speakText } from "@/utils/GlobalServices";
 import { CoachingExpert, CoachingExperts } from "@/utils/Options";
 import ChatBox from "./ChatBox";
 import { UserContext } from "@/app/context/UserContext";
