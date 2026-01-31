@@ -1,17 +1,10 @@
 "use client";
 
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, useCallback } from "react";
 import {
-  SOCKET_STATES,
-  LiveTranscriptionEvent,
-  LiveTranscriptionEvents,
-  useDeepgram,
-} from "@/app/context/DeepgramContextProvider";
-import {
-  MicrophoneEvents,
-  MicrophoneState,
-  useMicrophone,
-} from "@/app/context/MicrophoneContextProvider";
+  SpeechRecognitionState,
+  useSpeechRecognition,
+} from "@/app/context/ElevenLabsContextProvider";
 
 import { fetchCoachingResponse, speakText } from "@/utils/GlobalServices";
 import { CoachingExpert, CoachingExperts } from "@/utils/Options";
@@ -83,46 +76,7 @@ function App({ roomId }: { roomId: string }) {
   const [finalConversation, setFinalConversation] = useState<string>("");
   const [rateLimited, setRateLimited] = useState<boolean>(false);
   const { userData, setUserData } = useContext(UserContext)!;
-  const [conversation, setConversation] = useState<Message[]>([
-    {
-      role: "user",
-      content: "Hey, can you help me learn TypeScript?",
-    },
-    {
-      role: "assistant",
-      content:
-        "Of course! TypeScript is a typed superset of JavaScript. What would you like to focus on?",
-    },
-    {
-      role: "user",
-      content: "I want to understand types and interfaces.",
-    },
-    {
-      role: "assistant",
-      content:
-        "Great! Types and interfaces both let you define the shape of objects. Would you like an example?",
-    },
-    {
-      role: "user",
-      content: "Yes, that would be helpful.",
-    },
-    {
-      role: "assistant",
-      content: `Here's a basic example:
-    
-type User = {
-  name: string;
-  age: number;
-};
-
-interface Product {
-  id: number;
-  name: string;
-}
-
-Both define shapes of objects, but interfaces can be extended more easily.`,
-    },
-  ]);
+  const [conversation, setConversation] = useState<Message[]>([]);
   const bufferedTranscriptRef = useRef<string>("");
   const captionTimeout = useRef<NodeJS.Timeout | null>(null);
   const bufferInterval = useRef<NodeJS.Timeout | null>(null);
@@ -131,48 +85,61 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
 
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("idle");
 
-
+  // Speech Recognition (Web Speech API - free, real-time)
   const {
-    connection,
-    connectToDeepgram,
     connectionState,
-    disconnectFromDeepgram,
-  } = useDeepgram();
-  const {
-    setupMicrophone,
-    microphone,
-    startMicrophone,
-    microphoneState,
-    stopMicrophone,
-  } = useMicrophone();
+    connect: connectSpeechRecognition,
+    disconnect: disconnectSpeechRecognition,
+    addTranscriptListener,
+    removeTranscriptListener,
+    interimTranscript,
+  } = useSpeechRecognition();
+
+  // Track if we're processing to avoid overlapping AI requests
+  const isProcessingRef = useRef(false);
+  const lastProcessedTimeRef = useRef(0);
 
   async function handleConnect() {
-    await setupMicrophone();
-
-    const username = userData?.name || "there";
-    const introText = `       Hi ${username}, How can I help you today?.`;
-
-    // Add assistant message to chat
-    setConversation((prev) => [
-      ...prev,
-      { role: "assistant", content: introText },
-    ]);
- 
-    await speakText(introText, DiscussionRoomData?.expertName || "Female");
- 
+    await connectSpeechRecognition();
     setSessionPhase("listening_intro");
+
+    // Get intro message from OpenAI instead of hardcoding
+    try {
+      const username = userData?.name || "there";
+      const introResponse = await fetchCoachingResponse({
+        topic: DiscussionRoomData?.topic as string,
+        coachingOption: DiscussionRoomData?.coachingOptions as string,
+        message: `[SYSTEM: This is the start of the session. User's name is ${username}. Give a brief, friendly greeting and ask them to introduce themselves. Keep it short - 1-2 sentences max.]`,
+      });
+
+      const introText = introResponse.content || `Hi ${username}, let's get started. Please introduce yourself.`;
+
+      // Deduct tokens for intro message
+      await updateToken(introText);
+
+      // Add assistant message to chat
+      setConversation((prev) => [
+        ...prev,
+        { role: "assistant", content: introText },
+      ]);
+
+      // Use ElevenLabs TTS via TalkingCharacter (non-blocking)
+      if (talkingCharacterRef.current?.isReady()) {
+        talkingCharacterRef.current.speak(introText, DiscussionRoomData?.expertName);
+      }
+    } catch (error) {
+      console.error("Error getting intro:", error);
+    }
   }
 
 
   async function handleDisconnect() {
     console.log("🚫 Disconnecting...");
     setCaption("");
-    await disconnectFromDeepgram();
-    await stopMicrophone();
+    disconnectSpeechRecognition();
     setShowFinalTranscript(true);
     console.log("📌 Final Transcript:", finalTranscript);
     console.log("📌 Final Conversation:", finalConversation);
-    clearInterval(bufferInterval.current!);
 
     // Update conversation via API
     try {
@@ -188,203 +155,174 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
     setEnableFeedback(true);
   }
 
-  const updateToken = async (content: string) => {
-    if (!userData?.id || typeof userData.credits !== "number") return;
+  const updateToken = useCallback(async (content: string) => {
+    console.log("🔄 updateToken called with:", content?.substring(0, 50));
+    
+    if (!userData?.id) {
+      console.log("⚠️ No userData.id, skipping token update");
+      return;
+    }
+    if (typeof userData.credits !== "number") {
+      console.log("⚠️ No credits number, skipping token update");
+      return;
+    }
 
     // Token count is the number of words (simple estimate)
     const tokenCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+    const newCredits = Math.max(userData.credits - tokenCount, 0);
 
-    const newCredits = Math.max(userData.credits - tokenCount, 0); // prevent negative credits
+    console.log(`📊 Deducting ${tokenCount} tokens. ${userData.credits} → ${newCredits}`);
 
     try {
-      await fetch("/api/users", {
+      const response = await fetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: userData.id, credits: newCredits }),
       });
+      
+      if (!response.ok) {
+        console.error("❌ Users API failed:", response.status);
+        return;
+      }
 
-      setUserData(
-        (prev) =>
-          prev
-            ? {
-              ...prev,
-              credits: newCredits,
-            }
-            : undefined, // In case `prev` was undefined, keep it that way
+      setUserData((prev) =>
+        prev ? { ...prev, credits: newCredits } : undefined
       );
-      console.log(`Deducted ${tokenCount} tokens. Remaining: ${newCredits}`);
+      console.log(`✅ Token update successful. Remaining: ${newCredits}`);
     } catch (error) {
-      console.error("Failed to update user tokens:", error);
+      console.error("❌ Failed to update user tokens:", error);
     }
-  };
+  }, [userData?.id, userData?.credits, setUserData]);
 
+  // Update caption with interim transcript for live display
   useEffect(() => {
-    if (microphoneState === MicrophoneState.Ready) {
-      console.log("🎙️ Microphone ready. Connecting to Deepgram...");
-      connectToDeepgram({
-        model: "nova-3",
-        interim_results: true,
-        smart_format: true,
-        filler_words: true,
-        utterance_end_ms: 3000,
-      });
+    if (interimTranscript) {
+      setCaption(interimTranscript);
     }
-    console.log("🎙️ Microphone ready. Connected to Deepgram...");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [microphoneState]);
+  }, [interimTranscript]);
 
-  useEffect(() => {
-    if (!microphone || !connection) return;
+  // Process transcript and send to AI
+  const processTranscript = useCallback(async (transcriptText: string) => {
+    if (!transcriptText || transcriptText.length < 2) return;
+    if (rateLimited) {
+      console.log("⚠️ Rate limited, skipping");
+      return;
+    }
+    
+    // Prevent rapid-fire requests (wait at least 1 second between requests)
+    const now = Date.now();
+    if (now - lastProcessedTimeRef.current < 1000) {
+      console.log("⏳ Too fast, waiting...");
+      return;
+    }
+    
+    // If already processing, queue for later
+    if (isProcessingRef.current) {
+      console.log("⏳ Already processing, skipping this input");
+      return;
+    }
 
-    const onData = (e: BlobEvent) => {
-      if (e.data.size > 0) {
-        connection?.send(e.data);
-      }
-    };
+    isProcessingRef.current = true;
+    lastProcessedTimeRef.current = now;
+    
+    console.log("📤 Processing transcript:", transcriptText);
 
-    const onTranscript = (data: LiveTranscriptionEvent) => {
-      const thisCaption = data.channel.alternatives[0]?.transcript.trim() || "";
-      const { is_final: isFinal } = data;
+    // Clear caption after processing
+    setCaption("");
 
-      if (!thisCaption) return;
+    // Get current conversation for history BEFORE adding user message
+    const currentConversation = [...conversation];
+    
+    // Add user message to conversation
+    const newUserMessage: Message = { role: "user", content: transcriptText };
+    const updatedConversation = [...currentConversation, newUserMessage];
+    setConversation(updatedConversation);
 
-      setCaption(thisCaption);
+    // Update final transcript
+    setFinalTranscript((prev) => (prev + " " + transcriptText).trim());
 
-      setFinalTranscript((prev) => {
-        const prevWords = prev.split(" ");
-        const captionWords = thisCaption.split(" ");
+    console.log("📤 Sending to AI with history (", updatedConversation.length, "messages):", transcriptText);
 
-        if (
-          !prevWords.slice(-captionWords.length).join(" ").includes(thisCaption)
-        ) {
-          return (prev + " " + thisCaption).trim();
-        }
-        return prev;
+    try {
+      const aiResponse = await fetchCoachingResponse({
+        topic: DiscussionRoomData?.topic as string,
+        coachingOption: DiscussionRoomData?.coachingOptions as string,
+        message: transcriptText,
+        conversationHistory: updatedConversation, // Pass conversation history!
       });
 
-      if (isFinal) {
-        if (!bufferedTranscriptRef.current.endsWith(thisCaption)) {
-          bufferedTranscriptRef.current += " " + thisCaption;
+      if (aiResponse.error) {
+        console.error("⚠️ AI API error:", aiResponse.error);
+        setConversation((prev) => [
+          ...prev,
+          { role: "assistant", content: aiResponse.error ?? "" },
+        ]);
+
+        if (aiResponse.error.includes("Rate limit")) {
+          setRateLimited(true);
+        }
+      } else if (aiResponse.content) {
+        console.log("🤖 AI Response:", aiResponse.content);
+        setFinalConversation((prev) => prev + " " + aiResponse.content);
+        await updateToken(aiResponse.content);
+
+        // Add to conversation
+        setConversation((prev) => [
+          ...prev,
+          { role: "assistant", content: aiResponse.content || "" },
+        ]);
+
+        // Speak with ElevenLabs TTS via TalkingCharacter (non-blocking to allow continuous listening)
+        console.log("🔊 Speaking with ElevenLabs:", aiResponse.content);
+        if (talkingCharacterRef.current?.isReady()) {
+          // Don't await - let speech play while still listening
+          talkingCharacterRef.current.speak(
+            aiResponse.content,
+            DiscussionRoomData?.expertName
+          );
         }
       }
+    } catch (err) {
+      console.error("⚠️ AI API error:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setConversation((prev) => [
+        ...prev,
+        { role: "assistant", content: errorMessage },
+      ]);
+    } finally {
+      // Always reset processing flag
+      isProcessingRef.current = false;
+      console.log("✅ Processing complete, ready for next input");
+    }
+  }, [DiscussionRoomData, rateLimited, updateToken, conversation]);
+
+  // Listen for final transcripts from Speech Recognition
+  useEffect(() => {
+    if (connectionState !== SpeechRecognitionState.OPEN) return;
+
+    // Handle final transcript
+    const onTranscript = (data: { text: string; is_final: boolean }) => {
+      const transcriptText = data.text.trim();
+      if (!transcriptText) return;
+
+      console.log("🎤 Final transcript received:", transcriptText, "| Processing:", isProcessingRef.current);
+      
+      // Process the transcript
+      processTranscript(transcriptText);
 
       if (captionTimeout.current) clearTimeout(captionTimeout.current);
       captionTimeout.current = setTimeout(() => setCaption(undefined), 3000);
     };
 
-    if (connectionState === SOCKET_STATES.open) {
-      connection.addListener(LiveTranscriptionEvents.Transcript, onTranscript);
-      microphone.addEventListener(MicrophoneEvents.DataAvailable, onData);
-      startMicrophone();
-
-      bufferInterval.current = setInterval(async () => {
-        if (rateLimited) return;
-
-        const bufferedMessage = bufferedTranscriptRef.current.trim();
-        setConversation((prev) => [
-          ...prev,
-          {
-            role: "user",
-            content: bufferedMessage,
-          },
-        ]);
-        if (bufferedMessage) {
-          console.log("📤 Sending to Gemini:", bufferedMessage);
-          try {
-            const aiResponse = await fetchCoachingResponse({
-              topic: DiscussionRoomData?.topic as string,
-              coachingOption: DiscussionRoomData?.coachingOptions as string,
-              message: bufferedMessage,
-            });
-
-            if (aiResponse.error) {
-              console.error("⚠️ Gemini API error:", aiResponse.error);
-              setFinalConversation((prev) => prev + " " + aiResponse.error);
-              setConversation((prev) => [
-                ...prev,
-                {
-                  role: "assistant",
-                  content: aiResponse.error ?? "",
-                },
-              ]);
-
-              if (aiResponse.error.includes("Rate limit exceeded")) {
-                console.warn("🚨 Rate limit reached! Stopping API calls.");
-                setRateLimited(true);
-              }
-            } else if (aiResponse.content) {
-              console.log("🤖 Gemini Response:", aiResponse.content);
-              setFinalConversation((prev) => prev + " " + aiResponse.content);
-
-              //update user credits
-              await updateToken(aiResponse.content as string);
-
-              // Add to conversation first
-              setConversation((prev) => [
-                ...prev,
-                {
-                  role: "assistant",
-                  content: aiResponse.content || "",
-                },
-              ]);
-
-              // Use TalkingCharacter for speech with lip sync
-              console.log(
-                "🔊 Speaking with TalkingCharacter:",
-                aiResponse.content,
-              );
-              if (talkingCharacterRef.current?.isReady()) {
-                talkingCharacterRef.current
-                  .speak(aiResponse.content as string)
-                  .then((success) => {
-                    if (success) {
-                      console.log("✅ TalkingCharacter speech completed");
-                    } else {
-                      console.error("❌ TalkingCharacter speech failed");
-                    }
-                  })
-                  .catch((err) => {
-                    console.error("❌ TalkingCharacter error:", err);
-                  });
-              } else {
-                console.warn("⚠️ TalkingCharacter not ready, using fallback");
-                // Fallback to basic speech
-                const utter = new SpeechSynthesisUtterance(
-                  aiResponse.content as string,
-                );
-                utter.rate = 0.9;
-                window.speechSynthesis.speak(utter);
-              }
-            }
-          } catch (err) {
-            console.error("⚠️ Gemini API error:", err);
-            const errorMessage =
-              err instanceof Error ? err.message : String(err);
-            setFinalConversation((prev) => prev + " " + errorMessage);
-            setConversation((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content: errorMessage,
-              },
-            ]);
-          }
-          bufferedTranscriptRef.current = "";
-        }
-      }, 20000);
-    }
+    // Add listener
+    addTranscriptListener(onTranscript);
 
     return () => {
-      connection.removeListener(
-        LiveTranscriptionEvents.Transcript,
-        onTranscript,
-      );
-      microphone.removeEventListener(MicrophoneEvents.DataAvailable, onData);
+      removeTranscriptListener(onTranscript);
       if (captionTimeout.current) clearTimeout(captionTimeout.current);
-      if (bufferInterval.current) clearInterval(bufferInterval.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionState, rateLimited]);
+  }, [connectionState, processTranscript]);
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-gray-900">
@@ -433,7 +371,7 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
                 </span>
               </div>
             )}
-            {microphoneState === MicrophoneState.Open && (
+            {connectionState === SpeechRecognitionState.OPEN && (
               <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 backdrop-blur-md border border-green-500/30 rounded-full">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 <span className="text-sm font-medium text-green-400">Live</span>
@@ -479,7 +417,7 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
       {/* Controls - Bottom Center */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
         <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/10">
-          {microphoneState !== MicrophoneState.Open ? (
+          {connectionState !== SpeechRecognitionState.OPEN ? (
             <button
               onClick={handleConnect}
               className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all font-semibold"
