@@ -1,10 +1,14 @@
-import { Button } from "@/components/ui/button";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  return (
-    <div>
-      Satyam
-      <Button>Hii</Button>
-    </div>
-  );
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/dashboard");
+  }, [router]);
+
+  return null; // or a loader if you want
 }

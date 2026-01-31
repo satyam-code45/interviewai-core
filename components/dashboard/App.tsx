@@ -13,12 +13,15 @@ import {
   useMicrophone,
 } from "@/app/context/MicrophoneContextProvider";
 
-import { speakText, fetchCoachingResponse } from "@/utils/GlobalServices";
+import { fetchCoachingResponse } from "@/utils/GlobalServices";
 import { CoachingExpert, CoachingExperts } from "@/utils/Options";
 import ChatBox from "./ChatBox";
-import Image from "next/image";
 import { UserContext } from "@/app/context/UserContext";
 import Webcam from "react-webcam";
+import TalkingCharacter, {
+  TalkingCharacterRef,
+} from "@/components/talkchar/TalkingCharacter";
+import Squares from "@/components/ui/Squares";
 
 export type Message = {
   role: "user" | "assistant";
@@ -42,6 +45,11 @@ function App({ roomId }: { roomId: string }) {
   const [expert, setExpert] = useState<CoachingExpert | undefined>(undefined);
   const [DiscussionRoomData, setDiscussionRoomData] =
     useState<DiscussionRoom | null>(null);
+
+  // Ref for TalkingCharacter
+  const talkingCharacterRef = useRef<TalkingCharacterRef>(null);
+  const [isCharacterSpeaking, setIsCharacterSpeaking] = useState(false);
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(true);
 
   // Fetch discussion room data
   useEffect(() => {
@@ -320,20 +328,33 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
                 },
               ]);
 
-              // Use free Web Speech API for TTS (non-blocking)
-              const voiceName = DiscussionRoomData?.expertName || "Female";
-              console.log("🔊 Calling speakText with:", aiResponse.content);
-              speakText(aiResponse.content as string, voiceName)
-                .then((success) => {
-                  if (success) {
-                    console.log("✅ Speech completed successfully");
-                  } else {
-                    console.error("❌ Speech failed");
-                  }
-                })
-                .catch((err) => {
-                  console.error("❌ Speech error:", err);
-                });
+              // Use TalkingCharacter for speech with lip sync
+              console.log(
+                "🔊 Speaking with TalkingCharacter:",
+                aiResponse.content,
+              );
+              if (talkingCharacterRef.current?.isReady()) {
+                talkingCharacterRef.current
+                  .speak(aiResponse.content as string)
+                  .then((success) => {
+                    if (success) {
+                      console.log("✅ TalkingCharacter speech completed");
+                    } else {
+                      console.error("❌ TalkingCharacter speech failed");
+                    }
+                  })
+                  .catch((err) => {
+                    console.error("❌ TalkingCharacter error:", err);
+                  });
+              } else {
+                console.warn("⚠️ TalkingCharacter not ready, using fallback");
+                // Fallback to basic speech
+                const utter = new SpeechSynthesisUtterance(
+                  aiResponse.content as string,
+                );
+                utter.rate = 0.9;
+                window.speechSynthesis.speak(utter);
+              }
             }
           } catch (err) {
             console.error("⚠️ Gemini API error:", err);
@@ -366,74 +387,263 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
   }, [connectionState, rateLimited]);
 
   return (
-    <div>
-      <h2 className="text-3xl font-bold">
-        {DiscussionRoomData?.coachingOptions}
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-5 lg:grid-cols-6 gap-3 lg:gap-10 mt-5">
-        <div className="md:col-span-3 lg:col-span-4">
-          <div className="h-[60vh] bg-gray-100 dark:bg-gray-700 border rounded-xl flex flex-col items-center justify-center relative">
-            {expert?.avatar && (
-              <Image
-                src={expert.avatar}
-                alt={expert.name}
-                width={200}
-                height={200}
-                className="rounded-full h-48 w-48 object-cover animate-pulse"
-              />
+    <div className="fixed inset-0 overflow-hidden bg-gray-900">
+      {/* Animated Squares Background */}
+      <div className="absolute inset-0 z-0">
+        <Squares
+          speed={0.3}
+          squareSize={50}
+          direction="diagonal"
+          borderColor="rgba(201, 151, 27, 0.15)"
+          hoverFillColor="rgba(201, 151, 27, 0.1)"
+        />
+      </div>
+
+      {/* Full Screen Character Container */}
+      <div className="absolute inset-0 z-10 flex items-center justify-center">
+        <TalkingCharacter
+          ref={talkingCharacterRef}
+          onSpeakStart={() => setIsCharacterSpeaking(true)}
+          onSpeakEnd={() => setIsCharacterSpeaking(false)}
+          className="w-full h-full max-w-4xl max-h-[80vh]"
+        />
+      </div>
+
+      {/* Top Header Bar */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-4">
+        <div className="flex items-center justify-between">
+          {/* Session Info */}
+          <div className="bg-black/40 backdrop-blur-md rounded-2xl px-5 py-3 border border-white/10">
+            <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">
+              SESSION
+            </p>
+            <h1 className="text-lg font-bold text-white">
+              {DiscussionRoomData?.coachingOptions}
+            </h1>
+            <p className="text-xs text-white/60">{DiscussionRoomData?.topic}</p>
+          </div>
+
+          {/* Status Indicators */}
+          <div className="flex items-center gap-3">
+            {isCharacterSpeaking && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-primary/20 backdrop-blur-md border border-primary/30 rounded-full">
+                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                <span className="text-sm font-medium text-primary">
+                  AI Speaking
+                </span>
+              </div>
             )}
-            <h2 className="text-2xl font-bold">{expert?.name}</h2>
-
-            {/* <div className="p-5 bg-gray-300 dark:bg-gray-800 px-10 rounded-2xl absolute bottom-10 right-10">
-              <UserButton />
-              
-            </div> */}
-
-            <div className="absolute bottom-10 right-10">
-              <Webcam height={80} width={130} className="rounded-2xl" />
-            </div>
-          </div>
-          <div className="mt-5 flex items-center justify-center">
-            <div className="flex">
-              <div className="mb-3">
-                {microphoneState !== MicrophoneState.Open ? (
-                  <button
-                    onClick={handleConnect}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg shadow-md hover:bg-green-700 transition-all"
-                  >
-                    Connect
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleDisconnect}
-                    className="bg-red-600 text-white px-6 py-2 rounded-lg shadow-md hover:bg-red-700 transition-all"
-                  >
-                    Disconnect
-                  </button>
-                )}
+            {microphoneState === MicrophoneState.Open && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 backdrop-blur-md border border-green-500/30 rounded-full">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-sm font-medium text-green-400">Live</span>
               </div>
-              <div className="absolute mt-9 max-w-4xl mx-auto text-center">
-                {caption || showFinalTranscript ? (
-                  <div className="bg-black/70 rounded-2xl p-8 inline-block text-white">
-                    {caption && <p className="mb-2">{caption}</p>}
-                    {showFinalTranscript && <p>{finalTranscript}</p>}
-                  </div>
-                ) : null}
-              </div>
-            </div>
+            )}
           </div>
-        </div>
-        <div className="md:col-span-2">
-          <ChatBox
-            conversation={conversation}
-            coachingOption={DiscussionRoomData?.coachingOptions as string}
-            enableFeedback={enableFeedback}
-            id={roomId}
-            content="At the end of your conversation we will automatically generate
-          Notes/Feedback"
-          />
         </div>
       </div>
+
+      {/* User Webcam - Bottom Left */}
+      <div className="absolute bottom-24 left-6 z-30">
+        <div className="relative">
+          <div className="w-40 h-32 rounded-2xl overflow-hidden border-2 border-primary/50 shadow-2xl bg-gray-800">
+            <Webcam
+              height={128}
+              width={160}
+              className="w-full h-full object-cover"
+              mirrored
+            />
+          </div>
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full border border-white/10">
+            <span className="text-xs text-white/80 font-medium">You</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Caption Overlay - Bottom Center */}
+      {(caption || showFinalTranscript) && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 max-w-2xl w-full px-4">
+          <div className="bg-black/70 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/10">
+            {caption && (
+              <p className="text-white text-center text-lg">{caption}</p>
+            )}
+            {showFinalTranscript && !caption && (
+              <p className="text-white/70 text-center text-sm">
+                {finalTranscript}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Controls - Bottom Center */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
+        <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/10">
+          {microphoneState !== MicrophoneState.Open ? (
+            <button
+              onClick={handleConnect}
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all font-semibold"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                />
+              </svg>
+              Start Interview
+            </button>
+          ) : (
+            <button
+              onClick={handleDisconnect}
+              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all font-semibold"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
+                />
+              </svg>
+              End Interview
+            </button>
+          )}
+
+          {/* Transcript Toggle */}
+          <button
+            onClick={() => setIsTranscriptOpen(!isTranscriptOpen)}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl transition-all font-medium ${
+              isTranscriptOpen
+                ? "bg-primary/20 text-primary border border-primary/30"
+                : "bg-white/10 text-white/70 hover:bg-white/20 border border-white/10"
+            }`}
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+            Transcript
+          </button>
+        </div>
+      </div>
+
+      {/* Right Sidebar - Transcript Panel */}
+      <div
+        className={`absolute top-0 right-0 h-full z-40 transition-transform duration-300 ease-in-out ${
+          isTranscriptOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="w-96 h-full bg-black/60 backdrop-blur-xl border-l border-white/10 flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                  <svg
+                    className="w-5 h-5 text-primary"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm uppercase tracking-wide">
+                    Conversation
+                  </h3>
+                  <p className="text-xs text-white/50">Real-time transcript</p>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setIsTranscriptOpen(false)}
+                className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <svg
+                  className="w-4 h-4 text-white/70"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Chat Content */}
+          <div className="flex-1 overflow-hidden p-4">
+            <ChatBox
+              conversation={conversation}
+              coachingOption={DiscussionRoomData?.coachingOptions as string}
+              enableFeedback={enableFeedback}
+              id={roomId}
+              content="At the end of your conversation we will automatically generate Notes/Feedback"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Transcript Open Button (when closed) */}
+      {!isTranscriptOpen && (
+        <button
+          onClick={() => setIsTranscriptOpen(true)}
+          className="absolute top-1/2 right-0 -translate-y-1/2 z-30 bg-primary/90 hover:bg-primary text-white p-3 rounded-l-xl shadow-lg transition-all"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
