@@ -1,16 +1,15 @@
-import { Id } from "@/convex/_generated/dataModel";
-
 /**
  * User type definition
  * This represents the user details needed across the application
  */
 export type User = {
-  _id: Id<"users">;
-  _creationTime: number;
-  subscription?: string;
+  id: string;
   name: string;
   email: string;
   credits: number;
+  subscription?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 /**

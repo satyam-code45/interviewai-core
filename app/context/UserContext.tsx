@@ -1,15 +1,15 @@
 "use client";
-import { Id } from "@/convex/_generated/dataModel";
 import { createContext, Dispatch, SetStateAction } from "react";
 
-// Define your user type;
+// Define your user type
 export type UserData = {
-  _id: Id<"users">;
-  _creationTime: number;
-  subscription?: string;
+  id: string;
   name: string;
   email: string;
   credits: number;
+  subscription?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 // Define the context type

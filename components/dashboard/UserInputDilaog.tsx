@@ -13,8 +13,6 @@ import { BlurFade } from "../magicui/blur-fade";
 import Image from "next/image";
 import { useContext, useState } from "react";
 import { Button } from "../ui/button";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { UserContext } from "@/app/context/UserContext";
@@ -30,7 +28,6 @@ function UserInputDialog({
   const [topic, setTopic] = useState("");
   const router = useRouter();
 
-  const createDiscussionRoom = useMutation(api.DiscussionRoom.CreateNewRoom);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const context = useContext(UserContext);
@@ -38,21 +35,45 @@ function UserInputDialog({
 
   const onCLickNext = async () => {
     if (!userData) {
-      console.error("User data not available");
+      console.error("❌ User data not available. Context:", context);
+      alert("Please wait for user data to load or refresh the page.");
       return;
     }
 
+    console.log("✅ User data available:", userData);
     setLoading(true);
-    const result = await createDiscussionRoom({
-      coachingOptions: CoachingOption,
-      expertName: selectedExpert,
-      topic: topic,
-      uid: userData._id,
-    });
-    console.log("onclickNext", result);
-    setOpenDialog(false);
-    setLoading(false);
-    router.push(`/discussion-room/${result}`);
+    try {
+      console.log("📤 Creating discussion room...");
+      const response = await fetch("/api/discussion-rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coachingOptions: CoachingOption,
+          expertName: selectedExpert,
+          topic: topic,
+          userId: userData.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("❌ API error:", errorData);
+        throw new Error(errorData.error || "Failed to create room");
+      }
+
+      const result = await response.json();
+      console.log("✅ Room created successfully:", result);
+      setOpenDialog(false);
+      setLoading(false);
+
+      // Navigate to the discussion room
+      console.log("🚀 Navigating to:", `/discussion-room/${result.id}`);
+      router.push(`/discussion-room/${result.id}`);
+    } catch (error) {
+      console.error("❌ Error creating discussion room:", error);
+      alert("Failed to create discussion room. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (

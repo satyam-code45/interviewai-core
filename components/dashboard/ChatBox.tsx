@@ -3,16 +3,13 @@ import { Button } from "../ui/button";
 import { Message } from "./App";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 
 type ChatBoxProps = {
   coachingOption: string;
   conversation: Message[];
   enableFeedback: boolean;
   id: string;
-  content:string
+  content: string;
 };
 
 function ChatBox({
@@ -20,20 +17,30 @@ function ChatBox({
   conversation,
   enableFeedback,
   id,
-  content
+  content,
 }: ChatBoxProps) {
   const [loading, setLoading] = useState(false);
   const [feedbackGenerated, setFeedbackGenerated] = useState(false);
 
-  const UpdateSummary = useMutation(api.DiscussionRoom.UpdateSummary);
-
   const generateFeedback = async () => {
     setLoading(true);
-    const result = await fetchFeedback({ coachingOption, conversation });
-    console.log(result);
-    setLoading(false);
-    setFeedbackGenerated(true);
-    UpdateSummary({ id: id as Id<"DiscussionRoom">, summary: result });
+    try {
+      const result = await fetchFeedback({ coachingOption, conversation });
+      console.log(result);
+
+      // Update summary via API
+      await fetch("/api/discussion-rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, summary: result }),
+      });
+
+      setFeedbackGenerated(true);
+    } catch (error) {
+      console.error("Error generating feedback:", error);
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <div>
@@ -63,9 +70,7 @@ function ChatBox({
         </div>
       )}
       {!enableFeedback ? (
-        <h2 className="text-gray-400 p-3">
-          {content}
-        </h2>
+        <h2 className="text-gray-400 p-3">{content}</h2>
       ) : (
         <div className="flex flex-col justify-center items-center mt-4">
           <Button

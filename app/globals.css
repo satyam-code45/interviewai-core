@@ -1,6 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-
 
 @custom-variant dark (&:is(.dark *));
 
@@ -33,7 +31,7 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-primary: #007AFF;
+  --color-primary: #007aff;
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -43,7 +41,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
-
 
 @layer base {
   :root {
@@ -102,7 +99,6 @@
   }
 }
 
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -111,4 +107,3 @@
     @apply bg-background text-foreground;
   }
 }
-
