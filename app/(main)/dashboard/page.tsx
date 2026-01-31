@@ -1,15 +1,15 @@
 import FeatureAssistants from "@/components/dashboard/FeatureAssistants";
 import Feedback from "@/components/dashboard/Feedback";
-import History from "@/components/dashboard/History";
 
 function Dashboard() {
   return (
-    <div className="space-y-10">
-      <FeatureAssistants />
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="container mx-auto px-6 py-10 space-y-16">
+        <FeatureAssistants />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <History />
-        <Feedback />
+        <div className="max-w-5xl mx-auto">
+          <Feedback />
+        </div>
       </div>
     </div>
   );
