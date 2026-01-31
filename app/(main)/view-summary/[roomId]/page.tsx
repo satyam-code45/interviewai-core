@@ -1,22 +1,42 @@
 "use client";
 import ChatBox from "@/components/dashboard/ChatBox";
 import SummaryBox from "@/components/dashboard/SummaryBox";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { CoachingOptions } from "@/utils/Options";
-import { useQuery } from "convex/react";
 import moment from "moment";
 import Image from "next/image";
 import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+
+interface DiscussionRoom {
+  id: string;
+  createdAt: Date;
+  conversation?: unknown;
+  summary?: unknown;
+  coachingOptions: string;
+  topic: string;
+  expertName: string;
+  userId: string;
+}
 
 function ViewSummary() {
   const { roomId } = useParams();
+  const [DiscussionRoomData, setDiscussionRoomData] =
+    useState<DiscussionRoom | null>(null);
 
-  // Fetch discussion room data using roomId.
-  const DiscussionRoomData = useQuery(api.DiscussionRoom.GetDiscussionRoom, {
-    id: roomId as Id<"DiscussionRoom">,
-  });
-  console.log(DiscussionRoomData);
+  useEffect(() => {
+    const fetchRoom = async () => {
+      try {
+        const response = await fetch(`/api/discussion-rooms?id=${roomId}`);
+        const data = await response.json();
+        setDiscussionRoomData(data);
+      } catch (error) {
+        console.error("Error fetching room:", error);
+      }
+    };
+    if (roomId) {
+      fetchRoom();
+    }
+  }, [roomId]);
 
   const GetAbstractImages = (option: string | undefined) => {
     if (!option) return "/ab1.png";
@@ -43,7 +63,7 @@ function ViewSummary() {
           </div>
         </div>
         <h2 className="text-gray-400 text-sm">
-          {moment(DiscussionRoomData?._creationTime).fromNow()}
+          {DiscussionRoomData && moment(DiscussionRoomData.createdAt).fromNow()}
         </h2>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 mt-5">
@@ -57,7 +77,7 @@ function ViewSummary() {
           {DiscussionRoomData?.conversation && (
             <div>
               <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">
-               Your Conversation
+                Your Conversation
               </h2>
               <ChatBox
                 conversation={DiscussionRoomData?.conversation}

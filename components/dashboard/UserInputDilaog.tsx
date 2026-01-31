@@ -13,8 +13,6 @@ import { BlurFade } from "../magicui/blur-fade";
 import Image from "next/image";
 import { useContext, useState } from "react";
 import { Button } from "../ui/button";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { UserContext } from "@/app/context/UserContext";
@@ -30,7 +28,6 @@ function UserInputDialog({
   const [topic, setTopic] = useState("");
   const router = useRouter();
 
-  const createDiscussionRoom = useMutation(api.DiscussionRoom.CreateNewRoom);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const context = useContext(UserContext);
@@ -43,16 +40,27 @@ function UserInputDialog({
     }
 
     setLoading(true);
-    const result = await createDiscussionRoom({
-      coachingOptions: CoachingOption,
-      expertName: selectedExpert,
-      topic: topic,
-      uid: userData._id,
-    });
-    console.log("onclickNext", result);
-    setOpenDialog(false);
-    setLoading(false);
-    router.push(`/discussion-room/${result}`);
+    try {
+      const response = await fetch("/api/discussion-rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coachingOptions: CoachingOption,
+          expertName: selectedExpert,
+          topic: topic,
+          userId: userData.id,
+        }),
+      });
+
+      const result = await response.json();
+      console.log("onclickNext", result);
+      setOpenDialog(false);
+      router.push(`/discussion-room/${result.id}`);
+    } catch (error) {
+      console.error("Error creating discussion room:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

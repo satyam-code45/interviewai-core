@@ -1,28 +1,24 @@
 "use client";
 import { UserContext } from "@/app/context/UserContext";
-import { api } from "@/convex/_generated/api";
 import { CoachingOptions } from "@/utils/Options";
-import { useConvex } from "convex/react";
 import Image from "next/image";
 import { useContext, useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import moment from "moment";
 import Link from "next/link";
-import { Id } from "@/convex/_generated/dataModel";
 
 interface DiscussionRoom {
-  _id: Id<"DiscussionRoom">;
-  _creationTime: number;
+  id: string;
+  createdAt: Date;
   conversation?: unknown;
   summary?: unknown;
   coachingOptions: string;
   topic: string;
   expertName: string;
-  uid: Id<"users">;
+  userId: string;
 }
 
 function Feedback() {
-  const convex = useConvex();
   const context = useContext(UserContext);
   const userData = context?.userData;
   const [discussionRoomList, setDiscussionRoomList] = useState<
@@ -31,21 +27,22 @@ function Feedback() {
 
   useEffect(() => {
     const GetDiscussionRooms = async () => {
-      if (!userData?._id) return;
+      if (!userData?.id) return;
 
-      const result = await convex.query(
-        api.DiscussionRoom.GetAllPreviousDiscussion,
-        {
-          uid: userData._id,
-        },
-      );
-      console.log(result);
-      setDiscussionRoomList(result);
+      try {
+        const response = await fetch(
+          `/api/discussion-rooms?userId=${userData.id}`,
+        );
+        const result = await response.json();
+        console.log(result);
+        setDiscussionRoomList(result);
+      } catch (error) {
+        console.error("Error fetching discussion rooms:", error);
+      }
     };
     if (userData) {
       GetDiscussionRooms();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData]);
 
   const GetAbstractImages = (option: string) => {
@@ -62,7 +59,7 @@ function Feedback() {
       ) : (
         <div className="mt-5">
           {discussionRoomList.map((item) => (
-            <div key={item._id}>
+            <div key={item.id}>
               {![
                 "Topic Based Lecture",
                 "Learn Language",
@@ -81,11 +78,11 @@ function Feedback() {
                       <h2 className="font-bold">{item.topic}</h2>
                       <h2 className="text-gray-400">{item.coachingOptions}</h2>
                       <h2 className="text-gray-400 text-sm">
-                        {moment(item._creationTime).fromNow()}
+                        {moment(item.createdAt).fromNow()}
                       </h2>
                     </div>
                   </div>
-                  <Link href={"/view-summary/" + item._id}>
+                  <Link href={"/view-summary/" + item.id}>
                     <Button
                       variant={"outline"}
                       className="invisible group-hover:visible"

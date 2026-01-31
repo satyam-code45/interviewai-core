@@ -15,26 +15,47 @@ import {
 
 import { speakText, fetchCoachingResponse } from "@/utils/GlobalServices";
 import { CoachingExpert, CoachingExperts } from "@/utils/Options";
-import { useMutation, useQuery } from "convex/react";
-import { Id } from "@/convex/_generated/dataModel";
-import { api } from "@/convex/_generated/api";
 import ChatBox from "./ChatBox";
-// import { UserButton } from "@stackframe/stack";
 import Image from "next/image";
 import { UserContext } from "@/app/context/UserContext";
 import Webcam from "react-webcam";
+
 export type Message = {
   role: "user" | "assistant";
   content: string;
 };
 
+interface DiscussionRoom {
+  id: string;
+  createdAt: Date;
+  conversation?: any;
+  summary?: any;
+  coachingOptions: string;
+  topic: string;
+  expertName: string;
+  userId: string;
+}
+
 function App({ roomId }: { roomId: string }) {
   const [expert, setExpert] = useState<CoachingExpert | undefined>(undefined);
+  const [DiscussionRoomData, setDiscussionRoomData] =
+    useState<DiscussionRoom | null>(null);
 
-  // Fetch discussion room data using roomId.
-  const DiscussionRoomData = useQuery(api.DiscussionRoom.GetDiscussionRoom, {
-    id: roomId as Id<"DiscussionRoom">,
-  });
+  // Fetch discussion room data
+  useEffect(() => {
+    const fetchRoom = async () => {
+      try {
+        const response = await fetch(`/api/discussion-rooms?id=${roomId}`);
+        const data = await response.json();
+        setDiscussionRoomData(data);
+      } catch (error) {
+        console.error("Error fetching room:", error);
+      }
+    };
+    if (roomId) {
+      fetchRoom();
+    }
+  }, [roomId]);
 
   useEffect(() => {
     if (DiscussionRoomData) {
@@ -51,7 +72,6 @@ function App({ roomId }: { roomId: string }) {
     useState<boolean>(false);
   const [finalConversation, setFinalConversation] = useState<string>("");
   const [rateLimited, setRateLimited] = useState<boolean>(false);
-  const updateUserToken = useMutation(api.users.UpdateuserToken);
   const { userData, setUserData } = useContext(UserContext)!;
   const [conversation, setConversation] = useState<Message[]>([
     {
@@ -96,7 +116,6 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
   const bufferedTranscriptRef = useRef<string>("");
   const captionTimeout = useRef<NodeJS.Timeout | null>(null);
   const bufferInterval = useRef<NodeJS.Timeout | null>(null);
-  const UpdateConversation = useMutation(api.DiscussionRoom.UpdateConversation);
   const [enableFeedback, setEnableFeedback] = useState<boolean>(false);
 
   const {
@@ -126,15 +145,23 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
     console.log("📌 Final Transcript:", finalTranscript);
     console.log("📌 Final Conversation:", finalConversation);
     clearInterval(bufferInterval.current!);
-    await UpdateConversation({
-      id: DiscussionRoomData?._id as Id<"DiscussionRoom">,
-      conversation: conversation,
-    });
+
+    // Update conversation via API
+    try {
+      await fetch("/api/discussion-rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: DiscussionRoomData?.id, conversation }),
+      });
+    } catch (error) {
+      console.error("Error updating conversation:", error);
+    }
+
     setEnableFeedback(true);
   }
 
   const updateToken = async (content: string) => {
-    if (!userData?._id || typeof userData.credits !== "number") return;
+    if (!userData?.id || typeof userData.credits !== "number") return;
 
     // Token count is the number of words (simple estimate)
     const tokenCount = content.trim() ? content.trim().split(/\s+/).length : 0;
@@ -142,10 +169,12 @@ Both define shapes of objects, but interfaces can be extended more easily.`,
     const newCredits = Math.max(userData.credits - tokenCount, 0); // prevent negative credits
 
     try {
-      await updateUserToken({
-        id: userData._id as Id<"users">,
-        credits: newCredits,
+      await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userData.id, credits: newCredits }),
       });
+
       setUserData(
         (prev) =>
           prev
