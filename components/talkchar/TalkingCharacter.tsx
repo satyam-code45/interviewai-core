@@ -236,7 +236,7 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
 
         try {
           console.log("🎙️ ElevenLabs TTS: Requesting speech...");
-          
+
           // Call ElevenLabs TTS API
           const response = await fetch("/api/elevenlabs-tts", {
             method: "POST",
@@ -261,14 +261,17 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
           // Get phonemes for lip sync
           const phonemes = getSimplePhonemes(textToSpeak);
           const estimatedDuration = textToSpeak.split(" ").length * 0.4; // Faster estimate for ElevenLabs
-          const msPerPhoneme = Math.max(40, Math.min(100, (estimatedDuration * 1000) / phonemes.length));
+          const msPerPhoneme = Math.max(
+            40,
+            Math.min(100, (estimatedDuration * 1000) / phonemes.length),
+          );
 
           return new Promise((resolve) => {
             let currentIndex = 0;
 
             audio.onplay = () => {
               console.log("🔊 ElevenLabs audio started");
-              
+
               // Start lip sync animation
               intervalRef.current = setInterval(() => {
                 if (currentIndex >= phonemes.length) {
@@ -277,7 +280,8 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
                 }
 
                 const phoneme = phonemes[currentIndex];
-                const viseme = phoneme === "PAUSE" ? 0 : (phonemeToViseme[phoneme] ?? 4);
+                const viseme =
+                  phoneme === "PAUSE" ? 0 : (phonemeToViseme[phoneme] ?? 4);
                 lipInput.value = viseme;
                 currentIndex++;
               }, msPerPhoneme);

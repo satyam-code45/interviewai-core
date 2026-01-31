@@ -82,7 +82,6 @@ function App({ roomId }: { roomId: string }) {
   const bufferInterval = useRef<NodeJS.Timeout | null>(null);
   const [enableFeedback, setEnableFeedback] = useState<boolean>(false);
 
-
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>("idle");
 
   // Speech Recognition (Web Speech API - free, real-time)
@@ -112,7 +111,9 @@ function App({ roomId }: { roomId: string }) {
         message: `[SYSTEM: This is the start of the session. User's name is ${username}. Give a brief, friendly greeting and ask them to introduce themselves. Keep it short - 1-2 sentences max.]`,
       });
 
-      const introText = introResponse.content || `Hi ${username}, let's get started. Please introduce yourself.`;
+      const introText =
+        introResponse.content ||
+        `Hi ${username}, let's get started. Please introduce yourself.`;
 
       // Deduct tokens for intro message
       await updateToken(introText);
@@ -125,13 +126,15 @@ function App({ roomId }: { roomId: string }) {
 
       // Use ElevenLabs TTS via TalkingCharacter (non-blocking)
       if (talkingCharacterRef.current?.isReady()) {
-        talkingCharacterRef.current.speak(introText, DiscussionRoomData?.expertName);
+        talkingCharacterRef.current.speak(
+          introText,
+          DiscussionRoomData?.expertName,
+        );
       }
     } catch (error) {
       console.error("Error getting intro:", error);
     }
   }
-
 
   async function handleDisconnect() {
     console.log("🚫 Disconnecting...");
@@ -155,44 +158,51 @@ function App({ roomId }: { roomId: string }) {
     setEnableFeedback(true);
   }
 
-  const updateToken = useCallback(async (content: string) => {
-    console.log("🔄 updateToken called with:", content?.substring(0, 50));
-    
-    if (!userData?.id) {
-      console.log("⚠️ No userData.id, skipping token update");
-      return;
-    }
-    if (typeof userData.credits !== "number") {
-      console.log("⚠️ No credits number, skipping token update");
-      return;
-    }
+  const updateToken = useCallback(
+    async (content: string) => {
+      console.log("🔄 updateToken called with:", content?.substring(0, 50));
 
-    // Token count is the number of words (simple estimate)
-    const tokenCount = content.trim() ? content.trim().split(/\s+/).length : 0;
-    const newCredits = Math.max(userData.credits - tokenCount, 0);
-
-    console.log(`📊 Deducting ${tokenCount} tokens. ${userData.credits} → ${newCredits}`);
-
-    try {
-      const response = await fetch("/api/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: userData.id, credits: newCredits }),
-      });
-      
-      if (!response.ok) {
-        console.error("❌ Users API failed:", response.status);
+      if (!userData?.id) {
+        console.log("⚠️ No userData.id, skipping token update");
+        return;
+      }
+      if (typeof userData.credits !== "number") {
+        console.log("⚠️ No credits number, skipping token update");
         return;
       }
 
-      setUserData((prev) =>
-        prev ? { ...prev, credits: newCredits } : undefined
+      // Token count is the number of words (simple estimate)
+      const tokenCount = content.trim()
+        ? content.trim().split(/\s+/).length
+        : 0;
+      const newCredits = Math.max(userData.credits - tokenCount, 0);
+
+      console.log(
+        `📊 Deducting ${tokenCount} tokens. ${userData.credits} → ${newCredits}`,
       );
-      console.log(`✅ Token update successful. Remaining: ${newCredits}`);
-    } catch (error) {
-      console.error("❌ Failed to update user tokens:", error);
-    }
-  }, [userData?.id, userData?.credits, setUserData]);
+
+      try {
+        const response = await fetch("/api/users", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: userData.id, credits: newCredits }),
+        });
+
+        if (!response.ok) {
+          console.error("❌ Users API failed:", response.status);
+          return;
+        }
+
+        setUserData((prev) =>
+          prev ? { ...prev, credits: newCredits } : undefined,
+        );
+        console.log(`✅ Token update successful. Remaining: ${newCredits}`);
+      } catch (error) {
+        console.error("❌ Failed to update user tokens:", error);
+      }
+    },
+    [userData?.id, userData?.credits, setUserData],
+  );
 
   // Update caption with interim transcript for live display
   useEffect(() => {
@@ -202,99 +212,107 @@ function App({ roomId }: { roomId: string }) {
   }, [interimTranscript]);
 
   // Process transcript and send to AI
-  const processTranscript = useCallback(async (transcriptText: string) => {
-    if (!transcriptText || transcriptText.length < 2) return;
-    if (rateLimited) {
-      console.log("⚠️ Rate limited, skipping");
-      return;
-    }
-    
-    // Prevent rapid-fire requests (wait at least 1 second between requests)
-    const now = Date.now();
-    if (now - lastProcessedTimeRef.current < 1000) {
-      console.log("⏳ Too fast, waiting...");
-      return;
-    }
-    
-    // If already processing, queue for later
-    if (isProcessingRef.current) {
-      console.log("⏳ Already processing, skipping this input");
-      return;
-    }
-
-    isProcessingRef.current = true;
-    lastProcessedTimeRef.current = now;
-    
-    console.log("📤 Processing transcript:", transcriptText);
-
-    // Clear caption after processing
-    setCaption("");
-
-    // Get current conversation for history BEFORE adding user message
-    const currentConversation = [...conversation];
-    
-    // Add user message to conversation
-    const newUserMessage: Message = { role: "user", content: transcriptText };
-    const updatedConversation = [...currentConversation, newUserMessage];
-    setConversation(updatedConversation);
-
-    // Update final transcript
-    setFinalTranscript((prev) => (prev + " " + transcriptText).trim());
-
-    console.log("📤 Sending to AI with history (", updatedConversation.length, "messages):", transcriptText);
-
-    try {
-      const aiResponse = await fetchCoachingResponse({
-        topic: DiscussionRoomData?.topic as string,
-        coachingOption: DiscussionRoomData?.coachingOptions as string,
-        message: transcriptText,
-        conversationHistory: updatedConversation, // Pass conversation history!
-      });
-
-      if (aiResponse.error) {
-        console.error("⚠️ AI API error:", aiResponse.error);
-        setConversation((prev) => [
-          ...prev,
-          { role: "assistant", content: aiResponse.error ?? "" },
-        ]);
-
-        if (aiResponse.error.includes("Rate limit")) {
-          setRateLimited(true);
-        }
-      } else if (aiResponse.content) {
-        console.log("🤖 AI Response:", aiResponse.content);
-        setFinalConversation((prev) => prev + " " + aiResponse.content);
-        await updateToken(aiResponse.content);
-
-        // Add to conversation
-        setConversation((prev) => [
-          ...prev,
-          { role: "assistant", content: aiResponse.content || "" },
-        ]);
-
-        // Speak with ElevenLabs TTS via TalkingCharacter (non-blocking to allow continuous listening)
-        console.log("🔊 Speaking with ElevenLabs:", aiResponse.content);
-        if (talkingCharacterRef.current?.isReady()) {
-          // Don't await - let speech play while still listening
-          talkingCharacterRef.current.speak(
-            aiResponse.content,
-            DiscussionRoomData?.expertName
-          );
-        }
+  const processTranscript = useCallback(
+    async (transcriptText: string) => {
+      if (!transcriptText || transcriptText.length < 2) return;
+      if (rateLimited) {
+        console.log("⚠️ Rate limited, skipping");
+        return;
       }
-    } catch (err) {
-      console.error("⚠️ AI API error:", err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setConversation((prev) => [
-        ...prev,
-        { role: "assistant", content: errorMessage },
-      ]);
-    } finally {
-      // Always reset processing flag
-      isProcessingRef.current = false;
-      console.log("✅ Processing complete, ready for next input");
-    }
-  }, [DiscussionRoomData, rateLimited, updateToken, conversation]);
+
+      // Prevent rapid-fire requests (wait at least 1 second between requests)
+      const now = Date.now();
+      if (now - lastProcessedTimeRef.current < 1000) {
+        console.log("⏳ Too fast, waiting...");
+        return;
+      }
+
+      // If already processing, queue for later
+      if (isProcessingRef.current) {
+        console.log("⏳ Already processing, skipping this input");
+        return;
+      }
+
+      isProcessingRef.current = true;
+      lastProcessedTimeRef.current = now;
+
+      console.log("📤 Processing transcript:", transcriptText);
+
+      // Clear caption after processing
+      setCaption("");
+
+      // Get current conversation for history BEFORE adding user message
+      const currentConversation = [...conversation];
+
+      // Add user message to conversation
+      const newUserMessage: Message = { role: "user", content: transcriptText };
+      const updatedConversation = [...currentConversation, newUserMessage];
+      setConversation(updatedConversation);
+
+      // Update final transcript
+      setFinalTranscript((prev) => (prev + " " + transcriptText).trim());
+
+      console.log(
+        "📤 Sending to AI with history (",
+        updatedConversation.length,
+        "messages):",
+        transcriptText,
+      );
+
+      try {
+        const aiResponse = await fetchCoachingResponse({
+          topic: DiscussionRoomData?.topic as string,
+          coachingOption: DiscussionRoomData?.coachingOptions as string,
+          message: transcriptText,
+          conversationHistory: updatedConversation, // Pass conversation history!
+        });
+
+        if (aiResponse.error) {
+          console.error("⚠️ AI API error:", aiResponse.error);
+          setConversation((prev) => [
+            ...prev,
+            { role: "assistant", content: aiResponse.error ?? "" },
+          ]);
+
+          if (aiResponse.error.includes("Rate limit")) {
+            setRateLimited(true);
+          }
+        } else if (aiResponse.content) {
+          console.log("🤖 AI Response:", aiResponse.content);
+          setFinalConversation((prev) => prev + " " + aiResponse.content);
+          await updateToken(aiResponse.content);
+
+          // Add to conversation
+          setConversation((prev) => [
+            ...prev,
+            { role: "assistant", content: aiResponse.content || "" },
+          ]);
+
+          // Speak with ElevenLabs TTS via TalkingCharacter (non-blocking to allow continuous listening)
+          console.log("🔊 Speaking with ElevenLabs:", aiResponse.content);
+          if (talkingCharacterRef.current?.isReady()) {
+            // Don't await - let speech play while still listening
+            talkingCharacterRef.current.speak(
+              aiResponse.content,
+              DiscussionRoomData?.expertName,
+            );
+          }
+        }
+      } catch (err) {
+        console.error("⚠️ AI API error:", err);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        setConversation((prev) => [
+          ...prev,
+          { role: "assistant", content: errorMessage },
+        ]);
+      } finally {
+        // Always reset processing flag
+        isProcessingRef.current = false;
+        console.log("✅ Processing complete, ready for next input");
+      }
+    },
+    [DiscussionRoomData, rateLimited, updateToken, conversation],
+  );
 
   // Listen for final transcripts from Speech Recognition
   useEffect(() => {
@@ -305,8 +323,13 @@ function App({ roomId }: { roomId: string }) {
       const transcriptText = data.text.trim();
       if (!transcriptText) return;
 
-      console.log("🎤 Final transcript received:", transcriptText, "| Processing:", isProcessingRef.current);
-      
+      console.log(
+        "🎤 Final transcript received:",
+        transcriptText,
+        "| Processing:",
+        isProcessingRef.current,
+      );
+
       // Process the transcript
       processTranscript(transcriptText);
 
@@ -395,8 +418,77 @@ function App({ roomId }: { roomId: string }) {
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full border border-white/10">
             <span className="text-xs text-white/80 font-medium">You</span>
           </div>
+
+          {/* Listening Indicator */}
+          {connectionState === SpeechRecognitionState.OPEN && (
+            <div className="absolute -top-3 -right-3 flex items-center justify-center">
+              <div className="relative">
+                {/* Pulsing rings */}
+                <div className="absolute inset-0 w-10 h-10 bg-red-500/30 rounded-full animate-ping" />
+                <div className="absolute inset-0 w-10 h-10 bg-red-500/20 rounded-full animate-pulse" />
+                {/* Mic icon */}
+                <div className="relative w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
+                  <svg
+                    className="w-5 h-5 text-white"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Live Listening Banner - Shows when actively listening */}
+      {connectionState === SpeechRecognitionState.OPEN && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30">
+          <div
+            className={`flex items-center gap-3 px-5 py-3 rounded-2xl border shadow-xl transition-all duration-300 ${
+              interimTranscript
+                ? "bg-green-500/20 border-green-500/50 backdrop-blur-md"
+                : "bg-red-500/20 border-red-500/50 backdrop-blur-md"
+            }`}
+          >
+            {/* Animated sound waves */}
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className={`w-1 rounded-full transition-all ${
+                    interimTranscript ? "bg-green-400" : "bg-red-400"
+                  }`}
+                  style={{
+                    height: interimTranscript
+                      ? `${8 + Math.random() * 16}px`
+                      : "8px",
+                    animation: interimTranscript
+                      ? `soundWave 0.5s ease-in-out ${i * 0.1}s infinite alternate`
+                      : "none",
+                  }}
+                />
+              ))}
+            </div>
+
+            <span
+              className={`text-sm font-semibold ${
+                interimTranscript ? "text-green-400" : "text-red-400"
+              }`}
+            >
+              {interimTranscript ? "🎤 Hearing you..." : "🎙️ Listening..."}
+            </span>
+
+            {interimTranscript && (
+              <span className="text-white/70 text-sm max-w-[200px] truncate">
+                "{interimTranscript}"
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Caption Overlay - Bottom Center */}
       {(caption || showFinalTranscript) && (

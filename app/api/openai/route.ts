@@ -53,15 +53,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     ];
 
     // Add conversation history if provided (limit to last 10 messages to save tokens)
+    // The conversation history already includes the current user message
     if (conversationHistory && conversationHistory.length > 0) {
       const recentHistory = conversationHistory.slice(-10);
       recentHistory.forEach((msg) => {
         messages.push({ role: msg.role, content: msg.content });
       });
+    } else {
+      // If no history, just add the current message
+      messages.push({ role: "user", content: message });
     }
 
-    // Add the current user message
-    messages.push({ role: "user", content: message });
+    console.log("📨 OpenAI messages:", JSON.stringify(messages.map(m => ({ role: m.role, content: m.content.substring(0, 50) }))));
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",

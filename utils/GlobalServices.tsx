@@ -88,11 +88,11 @@ export async function fetchFeedback({
 // ElevenLabs Text-to-Speech - High quality, low latency
 export const speakWithElevenLabs = async (
   text: string,
-  voiceName?: string
+  voiceName?: string,
 ): Promise<boolean> => {
   try {
     console.log("🎙️ ElevenLabs TTS: Speaking:", text.substring(0, 50) + "...");
-    
+
     const response = await fetch("/api/elevenlabs-tts", {
       method: "POST",
       headers: {
@@ -112,20 +112,20 @@ export const speakWithElevenLabs = async (
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
-    
+
     return new Promise((resolve) => {
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
         console.log("✅ ElevenLabs speech finished");
         resolve(true);
       };
-      
+
       audio.onerror = (error) => {
         console.error("❌ Audio playback error:", error);
         URL.revokeObjectURL(audioUrl);
         resolve(false);
       };
-      
+
       audio.play().catch((error) => {
         console.error("❌ Audio play failed:", error);
         resolve(false);
