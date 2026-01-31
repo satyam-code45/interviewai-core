@@ -1,10 +1,10 @@
-import axios from "axios";
 import { VoiceId } from "@aws-sdk/client-polly";
 import { Message } from "@/components/dashboard/App";
 
 export const getApiKey = async () => {
-  const result = await axios.get("/api/authenticate");
-  return result.data.apiKey; // Return only the API key
+  const response = await fetch("/api/authenticate");
+  const data = await response.json();
+  return data.apiKey; // Return only the API key
 };
 
 interface CoachingRequest {

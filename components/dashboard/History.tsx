@@ -4,8 +4,20 @@ import { CoachingOptions } from "@/utils/Options";
 import Image from "next/image";
 import { useContext, useEffect, useState } from "react";
 import { Button } from "../ui/button";
-import moment from "moment";
 import Link from "next/link";
+
+const formatTimeAgo = (date: Date) => {
+  const now = new Date();
+  const diffMs = now.getTime() - new Date(date).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+};
 
 interface DiscussionRoom {
   id: string;
@@ -78,7 +90,7 @@ function History() {
                       <h2 className="font-bold">{item.topic}</h2>
                       <h2 className="text-gray-400">{item.coachingOptions}</h2>
                       <h2 className="text-gray-400 text-sm">
-                        {moment(item.createdAt).fromNow()}
+                        {formatTimeAgo(item.createdAt)}
                       </h2>
                     </div>
                   </div>

@@ -2,10 +2,22 @@
 import ChatBox from "@/components/dashboard/ChatBox";
 import SummaryBox from "@/components/dashboard/SummaryBox";
 import { CoachingOptions } from "@/utils/Options";
-import moment from "moment";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+
+const formatTimeAgo = (date: Date) => {
+  const now = new Date();
+  const diffMs = now.getTime() - new Date(date).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+};
 
 interface DiscussionRoom {
   id: string;
@@ -63,7 +75,7 @@ function ViewSummary() {
           </div>
         </div>
         <h2 className="text-gray-400 text-sm">
-          {DiscussionRoomData && moment(DiscussionRoomData.createdAt).fromNow()}
+          {DiscussionRoomData && formatTimeAgo(DiscussionRoomData.createdAt)}
         </h2>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 mt-5">
