@@ -11,12 +11,14 @@ interface CoachingRequest {
   topic: string;
   coachingOption: string;
   message: string;
+  conversationHistory?: Message[];
 }
 
 export async function fetchCoachingResponse({
   topic,
   coachingOption,
   message,
+  conversationHistory,
 }: CoachingRequest): Promise<{ content?: string; error?: string }> {
   try {
     const res = await fetch("/api/openai", {
@@ -28,6 +30,7 @@ export async function fetchCoachingResponse({
         topic,
         coachingOption,
         message,
+        conversationHistory,
       }),
     });
 
@@ -82,7 +85,59 @@ export async function fetchFeedback({
   }
 }
 
-// Free Web Speech API (browser-based, no API keys needed)
+// ElevenLabs Text-to-Speech - High quality, low latency
+export const speakWithElevenLabs = async (
+  text: string,
+  voiceName?: string
+): Promise<boolean> => {
+  try {
+    console.log("🎙️ ElevenLabs TTS: Speaking:", text.substring(0, 50) + "...");
+    
+    const response = await fetch("/api/elevenlabs-tts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text,
+        voiceName: voiceName || "Female",
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("ElevenLabs TTS error:", await response.text());
+      return false;
+    }
+
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    
+    return new Promise((resolve) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        console.log("✅ ElevenLabs speech finished");
+        resolve(true);
+      };
+      
+      audio.onerror = (error) => {
+        console.error("❌ Audio playback error:", error);
+        URL.revokeObjectURL(audioUrl);
+        resolve(false);
+      };
+      
+      audio.play().catch((error) => {
+        console.error("❌ Audio play failed:", error);
+        resolve(false);
+      });
+    });
+  } catch (error) {
+    console.error("ElevenLabs TTS error:", error);
+    return false;
+  }
+};
+
+// Free Web Speech API (browser-based, no API keys needed) - Fallback
 export const speakText = (
   text: string,
   voiceName?: string,

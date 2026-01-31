@@ -77,7 +77,7 @@ const phonemeToViseme: Record<string, number> = {
   Y: 3,
 };
 
-// Simple phoneme generator (fallback without RiTa)
+// Simple phoneme generator for lip sync animation
 function getSimplePhonemes(text: string): string[] {
   const phonemes: string[] = [];
   const words = text.toLowerCase().split(/\s+/);
@@ -169,7 +169,7 @@ function getSimplePhonemes(text: string): string[] {
 }
 
 export interface TalkingCharacterRef {
-  speak: (text: string) => Promise<boolean>;
+  speak: (text: string, voiceName?: string) => Promise<boolean>;
   stop: () => void;
   isSpeaking: () => boolean;
   isReady: () => boolean;
@@ -187,11 +187,9 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
     { onSpeakStart, onSpeakEnd, className, style },
     ref,
   ) {
-    const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
     const [isSpeaking, setIsSpeaking] = useState(false);
-
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
-    const startTimeRef = useRef(0);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
     // Load Rive
     const { rive, RiveComponent } = useRive({
@@ -203,144 +201,140 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
     // Get the lip sync input
     const lipInput = useStateMachineInput(rive, "State Machine 1", "lipsid");
 
-    // Load voices
-    useEffect(() => {
-      const load = () => {
-        const loadedVoices = window.speechSynthesis.getVoices();
-        setVoices(loadedVoices);
-      };
-      load();
-      window.speechSynthesis.onvoiceschanged = load;
-    }, []);
-
     // Cleanup on unmount
     useEffect(() => {
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
-        window.speechSynthesis.cancel();
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
       };
     }, []);
 
-    // Speak function that can be called externally
+    // Speak function using ElevenLabs TTS
     const speak = useCallback(
-      (textToSpeak: string): Promise<boolean> => {
+      async (textToSpeak: string, voiceName?: string): Promise<boolean> => {
         if (!lipInput || !textToSpeak) {
           console.warn("Lip input not ready or no text provided");
-          return Promise.resolve(false);
+          return false;
         }
 
-        return new Promise((resolve) => {
-          // Reset everything
-          window.speechSynthesis.cancel();
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
+        // Stop any ongoing speech
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+
+        lipInput.value = 0;
+        setIsSpeaking(true);
+        onSpeakStart?.();
+
+        try {
+          console.log("🎙️ ElevenLabs TTS: Requesting speech...");
+          
+          // Call ElevenLabs TTS API
+          const response = await fetch("/api/elevenlabs-tts", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: textToSpeak,
+              voiceName: voiceName || "Female",
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`TTS API error: ${response.status}`);
           }
 
-          lipInput.value = 0;
-          setIsSpeaking(true);
-          onSpeakStart?.();
+          const audioBlob = await response.blob();
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          audioRef.current = audio;
 
-          // Get phonemes
+          // Get phonemes for lip sync
           const phonemes = getSimplePhonemes(textToSpeak);
-          console.log("🗣️ Speaking with", phonemes.length, "phonemes");
+          const estimatedDuration = textToSpeak.split(" ").length * 0.4; // Faster estimate for ElevenLabs
+          const msPerPhoneme = Math.max(40, Math.min(100, (estimatedDuration * 1000) / phonemes.length));
 
-          if (phonemes.length === 0) {
-            setIsSpeaking(false);
-            onSpeakEnd?.();
-            resolve(false);
-            return;
-          }
+          return new Promise((resolve) => {
+            let currentIndex = 0;
 
-          // Create utterance
-          const utter = new SpeechSynthesisUtterance(textToSpeak);
-          utter.rate = 0.9;
-          utter.pitch = 1.0;
-          utter.volume = 1.0;
-
-          if (voices.length > 0) {
-            // Try to find a good voice
-            const preferredVoice =
-              voices.find(
-                (v) =>
-                  v.name.includes("Google") ||
-                  v.name.includes("Microsoft") ||
-                  v.lang.startsWith("en"),
-              ) || voices[0];
-            utter.voice = preferredVoice;
-          }
-
-          // Calculate timing
-          const estimatedDuration = textToSpeak.split(" ").length * 0.5;
-          const msPerPhoneme = (estimatedDuration * 1000) / phonemes.length;
-          const adjustedMsPerPhoneme = Math.max(
-            50,
-            Math.min(150, msPerPhoneme),
-          );
-
-          let currentIndex = 0;
-
-          utter.onstart = () => {
-            console.log("🎤 Speech started");
-            startTimeRef.current = Date.now();
-
-            intervalRef.current = setInterval(() => {
-              if (currentIndex >= phonemes.length) {
-                lipInput.value = 0;
-                if (intervalRef.current) {
-                  clearInterval(intervalRef.current);
-                  intervalRef.current = null;
+            audio.onplay = () => {
+              console.log("🔊 ElevenLabs audio started");
+              
+              // Start lip sync animation
+              intervalRef.current = setInterval(() => {
+                if (currentIndex >= phonemes.length) {
+                  lipInput.value = 0;
+                  return;
                 }
-                return;
+
+                const phoneme = phonemes[currentIndex];
+                const viseme = phoneme === "PAUSE" ? 0 : (phonemeToViseme[phoneme] ?? 4);
+                lipInput.value = viseme;
+                currentIndex++;
+              }, msPerPhoneme);
+            };
+
+            audio.onended = () => {
+              console.log("✅ ElevenLabs speech finished");
+              lipInput.value = 0;
+              setIsSpeaking(false);
+              onSpeakEnd?.();
+              if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
               }
+              URL.revokeObjectURL(audioUrl);
+              resolve(true);
+            };
 
-              const phoneme = phonemes[currentIndex];
-              let viseme = 0;
-
-              if (phoneme === "PAUSE") {
-                viseme = 0;
-              } else {
-                viseme = phonemeToViseme[phoneme] ?? 4;
+            audio.onerror = (error) => {
+              console.error("❌ Audio playback error:", error);
+              lipInput.value = 0;
+              setIsSpeaking(false);
+              onSpeakEnd?.();
+              if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
               }
+              URL.revokeObjectURL(audioUrl);
+              resolve(false);
+            };
 
-              lipInput.value = viseme;
-              currentIndex++;
-            }, adjustedMsPerPhoneme);
-          };
-
-          utter.onend = () => {
-            console.log("🎤 Speech ended");
-            lipInput.value = 0;
-            setIsSpeaking(false);
-            onSpeakEnd?.();
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
-            }
-            resolve(true);
-          };
-
-          utter.onerror = (e) => {
-            console.error("❌ Speech error:", e);
-            lipInput.value = 0;
-            setIsSpeaking(false);
-            onSpeakEnd?.();
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
-            }
-            resolve(false);
-          };
-
-          window.speechSynthesis.speak(utter);
-        });
+            audio.play().catch((error) => {
+              console.error("❌ Audio play failed:", error);
+              lipInput.value = 0;
+              setIsSpeaking(false);
+              onSpeakEnd?.();
+              URL.revokeObjectURL(audioUrl);
+              resolve(false);
+            });
+          });
+        } catch (error) {
+          console.error("❌ ElevenLabs TTS error:", error);
+          lipInput.value = 0;
+          setIsSpeaking(false);
+          onSpeakEnd?.();
+          return false;
+        }
       },
-      [lipInput, voices, onSpeakStart, onSpeakEnd],
+      [lipInput, onSpeakStart, onSpeakEnd],
     );
 
     // Stop speaking
     const stop = useCallback(() => {
-      window.speechSynthesis.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;

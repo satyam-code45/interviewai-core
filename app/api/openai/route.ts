@@ -6,6 +6,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+interface ConversationMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body = await request.json();
@@ -14,10 +19,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       topic,
       coachingOption,
       message,
+      conversationHistory,
     }: {
       topic: string;
       coachingOption: string;
       message: string;
+      conversationHistory?: ConversationMessage[];
     } = body;
 
     if (!topic || !coachingOption || !message) {
@@ -40,12 +47,25 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const systemPrompt = option.prompt.replace("{user_topic}", topic);
 
+    // Build messages array with conversation history
+    const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: systemPrompt },
+    ];
+
+    // Add conversation history if provided (limit to last 10 messages to save tokens)
+    if (conversationHistory && conversationHistory.length > 0) {
+      const recentHistory = conversationHistory.slice(-10);
+      recentHistory.forEach((msg) => {
+        messages.push({ role: msg.role, content: msg.content });
+      });
+    }
+
+    // Add the current user message
+    messages.push({ role: "user", content: message });
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // cheaper & stable
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: message },
-      ],
+      model: "gpt-4o-mini",
+      messages,
       temperature: 0.7,
     });
 
