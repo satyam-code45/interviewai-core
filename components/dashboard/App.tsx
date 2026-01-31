@@ -4,7 +4,7 @@ import { useContext, useEffect, useRef, useState, useCallback } from "react";
 import {
   SpeechRecognitionState,
   useSpeechRecognition,
-} from "@/app/context/ElevenLabsContextProvider";
+} from "@/app/context/WhisperContextProvider";
 
 import { fetchCoachingResponse } from "@/utils/GlobalServices";
 import { CoachingExpert, CoachingExperts } from "@/utils/Options";
@@ -457,53 +457,6 @@ function App({ roomId }: { roomId: string }) {
           )}
         </div>
       </div>
-
-      {/* Live Listening Banner - Shows when actively listening */}
-      {connectionState === SpeechRecognitionState.OPEN && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30">
-          <div
-            className={`flex items-center gap-3 px-5 py-3 rounded-2xl border shadow-xl transition-all duration-300 ${
-              interimTranscript
-                ? "bg-green-500/20 border-green-500/50 backdrop-blur-md"
-                : "bg-red-500/20 border-red-500/50 backdrop-blur-md"
-            }`}
-          >
-            {/* Animated sound waves */}
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className={`w-1 rounded-full transition-all ${
-                    interimTranscript ? "bg-green-400" : "bg-red-400"
-                  }`}
-                  style={{
-                    height: interimTranscript
-                      ? `${8 + Math.random() * 16}px`
-                      : "8px",
-                    animation: interimTranscript
-                      ? `soundWave 0.5s ease-in-out ${i * 0.1}s infinite alternate`
-                      : "none",
-                  }}
-                />
-              ))}
-            </div>
-
-            <span
-              className={`text-sm font-semibold ${
-                interimTranscript ? "text-green-400" : "text-red-400"
-              }`}
-            >
-              {interimTranscript ? "🎤 Hearing you..." : "🎙️ Listening..."}
-            </span>
-
-            {interimTranscript && (
-              <span className="text-white/70 text-sm max-w-[200px] truncate">
-                "{interimTranscript}"
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Caption Overlay - Bottom Center */}
       {(caption || showFinalTranscript) && (
