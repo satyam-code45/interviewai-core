@@ -35,12 +35,15 @@ function UserInputDialog({
 
   const onCLickNext = async () => {
     if (!userData) {
-      console.error("User data not available");
+      console.error("❌ User data not available. Context:", context);
+      alert("Please wait for user data to load or refresh the page.");
       return;
     }
 
+    console.log("✅ User data available:", userData);
     setLoading(true);
     try {
+      console.log("📤 Creating discussion room...");
       const response = await fetch("/api/discussion-rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,13 +55,23 @@ function UserInputDialog({
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("❌ API error:", errorData);
+        throw new Error(errorData.error || "Failed to create room");
+      }
+
       const result = await response.json();
-      console.log("onclickNext", result);
+      console.log("✅ Room created successfully:", result);
       setOpenDialog(false);
+      setLoading(false);
+
+      // Navigate to the discussion room
+      console.log("🚀 Navigating to:", `/discussion-room/${result.id}`);
       router.push(`/discussion-room/${result.id}`);
     } catch (error) {
-      console.error("Error creating discussion room:", error);
-    } finally {
+      console.error("❌ Error creating discussion room:", error);
+      alert("Failed to create discussion room. Please try again.");
       setLoading(false);
     }
   };
