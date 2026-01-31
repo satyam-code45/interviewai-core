@@ -212,7 +212,7 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
       };
     }, []);
 
-    // Speak function using ElevenLabs TTS
+    // Speak function using Google Cloud TTS
     const speak = useCallback(
       async (textToSpeak: string, voiceName?: string): Promise<boolean> => {
         if (!lipInput || !textToSpeak) {
@@ -235,10 +235,10 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
         onSpeakStart?.();
 
         try {
-          console.log("🎙️ ElevenLabs TTS: Requesting speech...");
+          console.log("🎙️ Google TTS: Requesting speech...");
 
-          // Call ElevenLabs TTS API
-          const response = await fetch("/api/elevenlabs-tts", {
+          // Call Google Cloud TTS API
+          const response = await fetch("/api/google-tts", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -260,7 +260,7 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
 
           // Get phonemes for lip sync
           const phonemes = getSimplePhonemes(textToSpeak);
-          const estimatedDuration = textToSpeak.split(" ").length * 0.4; // Faster estimate for ElevenLabs
+          const estimatedDuration = textToSpeak.split(" ").length * 0.4; // Estimate for Google TTS
           const msPerPhoneme = Math.max(
             40,
             Math.min(100, (estimatedDuration * 1000) / phonemes.length),
@@ -270,7 +270,7 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
             let currentIndex = 0;
 
             audio.onplay = () => {
-              console.log("🔊 ElevenLabs audio started");
+              console.log("🔊 Google TTS audio started");
 
               // Start lip sync animation
               intervalRef.current = setInterval(() => {
@@ -288,7 +288,7 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
             };
 
             audio.onended = () => {
-              console.log("✅ ElevenLabs speech finished");
+              console.log("✅ Google TTS speech finished");
               lipInput.value = 0;
               setIsSpeaking(false);
               onSpeakEnd?.();
@@ -323,7 +323,7 @@ const TalkingCharacter = forwardRef<TalkingCharacterRef, TalkingCharacterProps>(
             });
           });
         } catch (error) {
-          console.error("❌ ElevenLabs TTS error:", error);
+          console.error("❌ Google TTS error:", error);
           lipInput.value = 0;
           setIsSpeaking(false);
           onSpeakEnd?.();

@@ -8,7 +8,6 @@ import {
   ReactNode,
   FunctionComponent,
   useCallback,
-  useEffect,
 } from "react";
 
 // Connection states
@@ -34,7 +33,6 @@ interface SpeechContextType {
     callback: (data: TranscriptionResult) => void,
   ) => void;
   interimTranscript: string;
-  setCharacterSpeaking: (speaking: boolean) => void;
 }
 
 const SpeechContext = createContext<SpeechContextType | undefined>(undefined);
@@ -43,10 +41,10 @@ interface SpeechContextProviderProps {
   children: ReactNode;
 }
 
-// Use Web Speech API for real-time STT
-const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
-  children,
-}) => {
+// Use Web Speech API for real-time STT with Google Cloud API fallback
+const GoogleSpeechContextProvider: FunctionComponent<
+  SpeechContextProviderProps
+> = ({ children }) => {
   const [connectionState, setConnectionState] =
     useState<SpeechRecognitionState>(SpeechRecognitionState.CLOSED);
   const [interimTranscript, setInterimTranscript] = useState<string>("");
@@ -57,14 +55,11 @@ const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
   >(new Set());
   const isConnectedRef = useRef(false);
   const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isCharacterSpeakingRef = useRef(false);
-  const lastActivityRef = useRef<number>(Date.now());
 
-  // Expose method to set character speaking state (prevents listening to AI voice)
+  // Expose method to set character speaking state
   const setCharacterSpeaking = useCallback((speaking: boolean) => {
     isCharacterSpeakingRef.current = speaking;
-    console.log(`🔇 Character speaking: ${speaking}`);
   }, []);
 
   // Create and start a new recognition instance
@@ -84,15 +79,12 @@ const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
-      console.log("✅ Speech Recognition STARTED");
+      console.log("✅ Speech Recognition STARTED (Google)");
       setConnectionState(SpeechRecognitionState.OPEN);
-      lastActivityRef.current = Date.now();
     };
 
     recognition.onresult = (event) => {
-      lastActivityRef.current = Date.now(); // Update activity timestamp
-
-      // Ignore input while character is speaking (prevents feedback loop)
+      // Ignore input while character is speaking
       if (isCharacterSpeakingRef.current) {
         console.log("🔇 Ignoring input while character is speaking");
         return;
@@ -180,40 +172,6 @@ const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
     return recognition;
   }, []);
 
-  // Force restart recognition if it seems stuck
-  const forceRestart = useCallback(() => {
-    if (!isConnectedRef.current) return;
-
-    console.log("🔄 Force restarting speech recognition...");
-
-    // Stop current recognition
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.onend = null; // Prevent normal restart
-        recognitionRef.current.stop();
-      } catch (e) {
-        // Ignore
-      }
-      recognitionRef.current = null;
-    }
-
-    // Create and start new instance
-    setTimeout(() => {
-      if (isConnectedRef.current) {
-        const newRecognition = createRecognition();
-        if (newRecognition) {
-          recognitionRef.current = newRecognition;
-          try {
-            newRecognition.start();
-            console.log("✅ Force restart successful");
-          } catch (e) {
-            console.error("Force restart failed:", e);
-          }
-        }
-      }
-    }, 100);
-  }, [createRecognition]);
-
   const connect = useCallback(async () => {
     if (isConnectedRef.current) {
       console.log("Already connected");
@@ -222,7 +180,6 @@ const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
 
     setConnectionState(SpeechRecognitionState.CONNECTING);
     isConnectedRef.current = true;
-    lastActivityRef.current = Date.now();
 
     const recognition = createRecognition();
     if (!recognition) {
@@ -235,33 +192,12 @@ const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
 
     try {
       recognition.start();
-
-      // Start keep-alive checker - restarts if no activity for 10 seconds
-      keepAliveIntervalRef.current = setInterval(() => {
-        if (!isConnectedRef.current) return;
-
-        const timeSinceActivity = Date.now() - lastActivityRef.current;
-        // If character is speaking, don't check for activity timeout
-        if (isCharacterSpeakingRef.current) {
-          lastActivityRef.current = Date.now(); // Reset timer while speaking
-          return;
-        }
-
-        // If no activity for 10 seconds and we should be connected, force restart
-        if (timeSinceActivity > 10000) {
-          console.log(
-            "⚠️ No speech activity for 10s, restarting recognition...",
-          );
-          lastActivityRef.current = Date.now();
-          forceRestart();
-        }
-      }, 3000);
     } catch (e) {
       console.error("Failed to start:", e);
       isConnectedRef.current = false;
       setConnectionState(SpeechRecognitionState.CLOSED);
     }
-  }, [createRecognition, forceRestart]);
+  }, [createRecognition]);
 
   const disconnect = useCallback(() => {
     console.log("🔴 Disconnecting speech recognition");
@@ -272,40 +208,17 @@ const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
       restartTimeoutRef.current = null;
     }
 
-    if (keepAliveIntervalRef.current) {
-      clearInterval(keepAliveIntervalRef.current);
-      keepAliveIntervalRef.current = null;
-    }
-
     if (recognitionRef.current) {
-      recognitionRef.current.onend = null;
-      recognitionRef.current.onerror = null;
       try {
         recognitionRef.current.stop();
       } catch (e) {
-        // Ignore
+        console.error("Error stopping recognition:", e);
       }
       recognitionRef.current = null;
     }
 
-    setInterimTranscript("");
     setConnectionState(SpeechRecognitionState.CLOSED);
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isConnectedRef.current = false;
-      if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
-      if (keepAliveIntervalRef.current)
-        clearInterval(keepAliveIntervalRef.current);
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {}
-      }
-    };
+    setInterimTranscript("");
   }, []);
 
   const addTranscriptListener = useCallback(
@@ -331,7 +244,6 @@ const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
         addTranscriptListener,
         removeTranscriptListener,
         interimTranscript,
-        setCharacterSpeaking,
       }}
     >
       {children}
@@ -339,14 +251,15 @@ const SpeechContextProvider: FunctionComponent<SpeechContextProviderProps> = ({
   );
 };
 
-function useSpeechRecognition(): SpeechContextType {
+// Custom hook to use speech recognition
+export function useSpeechRecognition() {
   const context = useContext(SpeechContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error(
-      "useSpeechRecognition must be used within SpeechContextProvider",
+      "useSpeechRecognition must be used within a GoogleSpeechContextProvider",
     );
   }
   return context;
 }
 
-export { SpeechContextProvider, useSpeechRecognition };
+export default GoogleSpeechContextProvider;

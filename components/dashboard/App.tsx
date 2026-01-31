@@ -77,6 +77,7 @@ function App({ roomId }: { roomId: string }) {
   const [rateLimited, setRateLimited] = useState<boolean>(false);
   const { userData, setUserData } = useContext(UserContext)!;
   const [conversation, setConversation] = useState<Message[]>([]);
+  const conversationRef = useRef<Message[]>([]); // Ref to avoid stale closures
   const bufferedTranscriptRef = useRef<string>("");
   const captionTimeout = useRef<NodeJS.Timeout | null>(null);
   const bufferInterval = useRef<NodeJS.Timeout | null>(null);
@@ -92,6 +93,7 @@ function App({ roomId }: { roomId: string }) {
     addTranscriptListener,
     removeTranscriptListener,
     interimTranscript,
+    setCharacterSpeaking,
   } = useSpeechRecognition();
 
   // Track if we're processing to avoid overlapping AI requests
@@ -118,11 +120,10 @@ function App({ roomId }: { roomId: string }) {
       // Deduct tokens for intro message
       await updateToken(introText);
 
-      // Add assistant message to chat
-      setConversation((prev) => [
-        ...prev,
-        { role: "assistant", content: introText },
-      ]);
+      // Add assistant message to chat (update both state and ref)
+      const introMessage: Message = { role: "assistant", content: introText };
+      conversationRef.current = [introMessage];
+      setConversation([introMessage]);
 
       // Use ElevenLabs TTS via TalkingCharacter (non-blocking)
       if (talkingCharacterRef.current?.isReady()) {
@@ -241,12 +242,15 @@ function App({ roomId }: { roomId: string }) {
       // Clear caption after processing
       setCaption("");
 
-      // Get current conversation for history BEFORE adding user message
-      const currentConversation = [...conversation];
+      // Use ref for current conversation (avoids stale closure)
+      const currentConversation = [...conversationRef.current];
 
       // Add user message to conversation
       const newUserMessage: Message = { role: "user", content: transcriptText };
       const updatedConversation = [...currentConversation, newUserMessage];
+
+      // Update both state and ref
+      conversationRef.current = updatedConversation;
       setConversation(updatedConversation);
 
       // Update final transcript
@@ -282,11 +286,16 @@ function App({ roomId }: { roomId: string }) {
           setFinalConversation((prev) => prev + " " + aiResponse.content);
           await updateToken(aiResponse.content);
 
-          // Add to conversation
-          setConversation((prev) => [
-            ...prev,
-            { role: "assistant", content: aiResponse.content || "" },
-          ]);
+          // Add to conversation (update both state and ref)
+          const assistantMessage: Message = {
+            role: "assistant",
+            content: aiResponse.content,
+          };
+          conversationRef.current = [
+            ...conversationRef.current,
+            assistantMessage,
+          ];
+          setConversation((prev) => [...prev, assistantMessage]);
 
           // Speak with ElevenLabs TTS via TalkingCharacter (non-blocking to allow continuous listening)
           console.log("🔊 Speaking with ElevenLabs:", aiResponse.content);
@@ -311,7 +320,7 @@ function App({ roomId }: { roomId: string }) {
         console.log("✅ Processing complete, ready for next input");
       }
     },
-    [DiscussionRoomData, rateLimited, updateToken, conversation],
+    [DiscussionRoomData, rateLimited, updateToken],
   );
 
   // Listen for final transcripts from Speech Recognition
@@ -364,8 +373,14 @@ function App({ roomId }: { roomId: string }) {
       <div className="absolute inset-0 z-10 flex items-center justify-center">
         <TalkingCharacter
           ref={talkingCharacterRef}
-          onSpeakStart={() => setIsCharacterSpeaking(true)}
-          onSpeakEnd={() => setIsCharacterSpeaking(false)}
+          onSpeakStart={() => {
+            setIsCharacterSpeaking(true);
+            setCharacterSpeaking(true); // Mute speech recognition while AI speaks
+          }}
+          onSpeakEnd={() => {
+            setIsCharacterSpeaking(false);
+            setCharacterSpeaking(false); // Resume speech recognition
+          }}
           className="w-full h-full max-w-4xl max-h-[80vh]"
         />
       </div>
