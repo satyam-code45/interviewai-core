@@ -7,7 +7,12 @@ import {
 } from "@/app/context/ElevenLabsContextProvider";
 
 import { fetchCoachingResponse } from "@/utils/GlobalServices";
-import { CoachingExpert, CoachingExperts } from "@/utils/Options";
+import {
+  CoachingExpert,
+  CoachingExperts,
+  InterviewerLevel,
+  InterviewerLevels,
+} from "@/utils/Options";
 import ChatBox from "./ChatBox";
 import { UserContext } from "@/app/context/UserContext";
 import Webcam from "react-webcam";
@@ -30,6 +35,7 @@ interface DiscussionRoom {
   topic: string;
   expertName: string;
   userId: string;
+  interviewerLevel?: InterviewerLevel;
 }
 
 type SessionPhase = "idle" | "intro" | "listening_intro" | "mock";
@@ -107,10 +113,21 @@ function App({ roomId }: { roomId: string }) {
     // Get intro message from OpenAI instead of hardcoding
     try {
       const username = userData?.name || "there";
+      const levelConfig = InterviewerLevels.find(
+        (l) => l.id === DiscussionRoomData?.interviewerLevel,
+      );
+      const levelGreeting =
+        levelConfig?.id === "newbie"
+          ? "Be warm and encouraging."
+          : levelConfig?.id === "expert"
+            ? "Be professional and direct."
+            : "Be balanced and professional.";
+
       const introResponse = await fetchCoachingResponse({
         topic: DiscussionRoomData?.topic as string,
         coachingOption: DiscussionRoomData?.coachingOptions as string,
-        message: `[SYSTEM: This is the start of the session. User's name is ${username}. Give a brief, friendly greeting and ask them to introduce themselves. Keep it short - 1-2 sentences max.]`,
+        message: `[SYSTEM: This is the start of the session. User's name is ${username}. ${levelGreeting} Give a brief greeting and ask them to introduce themselves. Keep it short - 1-2 sentences max.]`,
+        interviewerLevel: DiscussionRoomData?.interviewerLevel,
       });
 
       const introText =
@@ -269,6 +286,7 @@ function App({ roomId }: { roomId: string }) {
           coachingOption: DiscussionRoomData?.coachingOptions as string,
           message: transcriptText,
           conversationHistory: updatedConversation, // Pass conversation history!
+          interviewerLevel: DiscussionRoomData?.interviewerLevel, // Pass interviewer level!
         });
 
         if (aiResponse.error) {
@@ -401,6 +419,41 @@ function App({ roomId }: { roomId: string }) {
 
           {/* Status Indicators */}
           <div className="flex items-center gap-3">
+            {/* Interviewer Level Badge */}
+            {DiscussionRoomData?.interviewerLevel && (
+              <div
+                className={`flex items-center gap-2 px-4 py-2 backdrop-blur-md rounded-full border ${
+                  InterviewerLevels.find(
+                    (l) => l.id === DiscussionRoomData?.interviewerLevel,
+                  )?.bgColor || "bg-primary/20"
+                } ${
+                  InterviewerLevels.find(
+                    (l) => l.id === DiscussionRoomData?.interviewerLevel,
+                  )?.borderColor || "border-primary/30"
+                }`}
+              >
+                <span className="text-lg">
+                  {
+                    InterviewerLevels.find(
+                      (l) => l.id === DiscussionRoomData?.interviewerLevel,
+                    )?.icon
+                  }
+                </span>
+                <span
+                  className={`text-sm font-medium ${
+                    InterviewerLevels.find(
+                      (l) => l.id === DiscussionRoomData?.interviewerLevel,
+                    )?.color || "text-primary"
+                  }`}
+                >
+                  {
+                    InterviewerLevels.find(
+                      (l) => l.id === DiscussionRoomData?.interviewerLevel,
+                    )?.name
+                  }
+                </span>
+              </div>
+            )}
             {isCharacterSpeaking && (
               <div className="flex items-center gap-2 px-4 py-2 bg-primary/20 backdrop-blur-md border border-primary/30 rounded-full">
                 <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
@@ -422,16 +475,16 @@ function App({ roomId }: { roomId: string }) {
       {/* User Webcam - Bottom Left */}
       <div className="absolute bottom-24 left-6 z-30">
         <div className="relative">
-          <div className="w-40 h-32 rounded-2xl overflow-hidden border-2 border-primary/50 shadow-2xl bg-gray-800">
+          <div className="w-64 h-48 rounded-2xl overflow-hidden border-2 border-primary/50 shadow-2xl bg-gray-800">
             <Webcam
-              height={128}
-              width={160}
+              height={192}
+              width={256}
               className="w-full h-full object-cover"
               mirrored
             />
           </div>
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full border border-white/10">
-            <span className="text-xs text-white/80 font-medium">You</span>
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm px-4 py-1.5 rounded-full border border-white/10">
+            <span className="text-sm text-white/80 font-medium">You</span>
           </div>
 
           {/* Listening Indicator */}
@@ -439,12 +492,12 @@ function App({ roomId }: { roomId: string }) {
             <div className="absolute -top-3 -right-3 flex items-center justify-center">
               <div className="relative">
                 {/* Pulsing rings */}
-                <div className="absolute inset-0 w-10 h-10 bg-red-500/30 rounded-full animate-ping" />
-                <div className="absolute inset-0 w-10 h-10 bg-red-500/20 rounded-full animate-pulse" />
+                <div className="absolute inset-0 w-12 h-12 bg-red-500/30 rounded-full animate-ping" />
+                <div className="absolute inset-0 w-12 h-12 bg-red-500/20 rounded-full animate-pulse" />
                 {/* Mic icon */}
-                <div className="relative w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
+                <div className="relative w-12 h-12 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
                   <svg
-                    className="w-5 h-5 text-white"
+                    className="w-6 h-6 text-white"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
@@ -663,6 +716,7 @@ function App({ roomId }: { roomId: string }) {
               enableFeedback={enableFeedback}
               id={roomId}
               content="At the end of your conversation we will automatically generate Notes/Feedback"
+              interviewerLevel={DiscussionRoomData?.interviewerLevel}
             />
           </div>
         </div>

@@ -83,6 +83,106 @@ import SecondIcon from "@/components/icon/second";
 import ThirdIcon from "@/components/icon/third";
 import { ReactNode } from "react";
 
+// Interviewer difficulty levels
+export type InterviewerLevel = "newbie" | "intermediate" | "expert";
+
+export interface InterviewerLevelConfig {
+  id: InterviewerLevel;
+  name: string;
+  description: string;
+  icon: string;
+  tone: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+}
+
+export const InterviewerLevels: InterviewerLevelConfig[] = [
+  {
+    id: "newbie",
+    name: "Friendly",
+    description: "Supportive & encouraging interviewer. Perfect for beginners.",
+    icon: "",
+    tone: "friendly",
+    color: "text-green-500",
+    bgColor: "bg-green-500/10",
+    borderColor: "border-green-500/30",
+  },
+  {
+    id: "intermediate",
+    name: "Moderate",
+    description: "Balanced approach with constructive feedback.",
+    icon: "",
+    tone: "moderate",
+    color: "text-yellow-500",
+    bgColor: "bg-yellow-500/10",
+    borderColor: "border-yellow-500/30",
+  },
+  {
+    id: "expert",
+    name: "Strict",
+    description: "Challenging & demanding. Prepares you for tough interviews.",
+    icon: "",
+    tone: "strict",
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
+    borderColor: "border-red-500/30",
+  },
+];
+
+// Dynamic prompt generator based on difficulty level
+export const getDifficultyPrompt = (
+  level: InterviewerLevel,
+  topic: string,
+  baseType: string,
+): string => {
+  const levelConfig = {
+    newbie: {
+      personality: "friendly, supportive, and encouraging",
+      questionStyle:
+        "Start with basic, foundational questions. Give hints when the candidate struggles. Acknowledge good attempts even if not perfect.",
+      feedbackStyle:
+        "Always highlight what they did well first. Provide gentle guidance for improvements. Use phrases like 'Great start!', 'You're on the right track!', 'Nice thinking!'",
+      difficulty: "easy to moderate questions, building confidence",
+    },
+    intermediate: {
+      personality: "professional, balanced, and constructive",
+      questionStyle:
+        "Mix of foundational and challenging questions. Provide some follow-up questions to dig deeper. Give balanced feedback.",
+      feedbackStyle:
+        "Point out both strengths and areas for improvement equally. Be professional but fair. Use phrases like 'Good answer, but consider...', 'Let's explore deeper...'",
+      difficulty: "moderate questions with some challenging follow-ups",
+    },
+    expert: {
+      personality: "strict, demanding, and challenging",
+      questionStyle:
+        "Ask tough, in-depth questions. Challenge their answers with counter-questions. Expect detailed, precise responses. No hand-holding.",
+      feedbackStyle:
+        "Be direct and critical. Focus on gaps and weaknesses. Push for excellence. Use phrases like 'That's incomplete.', 'Dig deeper.', 'Not quite. Try again.'",
+      difficulty: "challenging questions that test deep understanding",
+    },
+  };
+
+  const config = levelConfig[level];
+
+  return `Act as a ${config.personality} interviewer for ${topic} in a ${baseType} session.
+
+**Your Personality:** ${config.personality}
+**Question Style:** ${config.questionStyle}
+**Feedback Style:** ${config.feedbackStyle}
+**Difficulty Level:** ${config.difficulty}
+
+**CRITICAL - Context Rules:**
+- NEVER repeat your introduction or opening question if conversation has started.
+- Always respond to what the user JUST said.
+- If user introduced themselves, move to questions immediately.
+- Each response must progress forward, never backwards.
+- Keep responses under 120 characters.
+- Maintain your ${level} interviewer personality throughout.
+
+Be responsive. Don't repeat yourself.`;
+};
+
 export interface CoachingOption {
   name: string;
   icon: ReactNode;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CoachingOptions } from "@/utils/Options";
+import { CoachingOptions, getDifficultyPrompt, InterviewerLevel } from "@/utils/Options";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -20,11 +20,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       coachingOption,
       message,
       conversationHistory,
+      interviewerLevel,
     }: {
       topic: string;
       coachingOption: string;
       message: string;
       conversationHistory?: ConversationMessage[];
+      interviewerLevel?: InterviewerLevel;
     } = body;
 
     if (!topic || !coachingOption || !message) {
@@ -45,7 +47,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const systemPrompt = option.prompt.replace("{user_topic}", topic);
+    // Use difficulty-based prompt if level is provided, otherwise use default
+    let systemPrompt: string;
+    if (interviewerLevel) {
+      systemPrompt = getDifficultyPrompt(interviewerLevel, topic, coachingOption);
+    } else {
+      systemPrompt = option.prompt.replace("{user_topic}", topic);
+    }
 
     // Build messages array with conversation history
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [

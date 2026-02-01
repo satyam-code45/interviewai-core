@@ -1,5 +1,6 @@
 import { VoiceId } from "@aws-sdk/client-polly";
 import { Message } from "@/components/dashboard/App";
+import { InterviewerLevel } from "@/utils/Options";
 
 export const getApiKey = async () => {
   const response = await fetch("/api/authenticate");
@@ -12,6 +13,7 @@ interface CoachingRequest {
   coachingOption: string;
   message: string;
   conversationHistory?: Message[];
+  interviewerLevel?: InterviewerLevel;
 }
 
 export async function fetchCoachingResponse({
@@ -19,6 +21,7 @@ export async function fetchCoachingResponse({
   coachingOption,
   message,
   conversationHistory,
+  interviewerLevel,
 }: CoachingRequest): Promise<{ content?: string; error?: string }> {
   try {
     const res = await fetch("/api/openai", {
@@ -31,6 +34,7 @@ export async function fetchCoachingResponse({
         coachingOption,
         message,
         conversationHistory,
+        interviewerLevel,
       }),
     });
 

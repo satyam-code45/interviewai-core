@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    const { coachingOptions, topic, expertName, userId } = await request.json();
+    const { coachingOptions, topic, expertName, userId, interviewerLevel } = await request.json();
 
     const room = await prisma.discussionRoom.create({
       data: {
@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
         topic,
         expertName,
         userId,
+        interviewerLevel: interviewerLevel || "intermediate",
       },
     });
 

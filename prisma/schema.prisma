@@ -28,6 +28,7 @@ model DiscussionRoom {
     coachingOptions String
     topic           String
     expertName      String
+    interviewerLevel String  @default("intermediate")
     conversation    Json?
     summary         Json?
     userId          String
