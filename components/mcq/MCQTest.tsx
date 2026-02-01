@@ -467,14 +467,15 @@ export function McqTest() {
       <div className="max-w-5xl mx-auto">
         {/* Main Container with yellow border */}
         <div className="rounded-3xl border-2 border-yellow-600/30 bg-card overflow-hidden">
-          
           {/* Header Section with gradient */}
           <div className="relative bg-gradient-to-r from-yellow-600/10 via-yellow-600/5 to-transparent p-6 md:p-8">
             <div className="absolute top-0 right-0 w-48 h-48 bg-yellow-600/5 rounded-full blur-3xl -z-10" />
-            
+
             <div className="flex flex-col items-center text-center relative">
               {/* Success Icon with animation */}
-              <div className={`relative mb-4 ${isPassed ? 'animate-bounce' : ''}`}>
+              <div
+                className={`relative mb-4 ${isPassed ? "animate-bounce" : ""}`}
+              >
                 <div
                   className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
                     isPassed
@@ -507,7 +508,7 @@ export function McqTest() {
               <h1 className="text-3xl md:text-4xl font-extrabold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                 Assessment Complete!
               </h1>
-              
+
               <p className="text-base text-muted-foreground mb-6">
                 {isPassed
                   ? "🎉 Outstanding Performance!"
@@ -570,19 +571,27 @@ export function McqTest() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 md:p-6 bg-background/50">
             <div className="text-center p-4 bg-background rounded-xl border border-border">
               <div className="text-2xl font-bold">{questions.length}</div>
-              <div className="text-xs text-muted-foreground mt-1">Total Questions</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Total Questions
+              </div>
             </div>
             <div className="text-center p-4 bg-background rounded-xl border border-border">
-              <div className="text-2xl font-bold">{formatTime(totalTime - timeLeft)}</div>
-              <div className="text-xs text-muted-foreground mt-1">Time Taken</div>
+              <div className="text-2xl font-bold">
+                {formatTime(totalTime - timeLeft)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Time Taken
+              </div>
             </div>
             <div className="text-center p-4 bg-background rounded-xl border border-border">
               <div className="text-2xl font-bold">{selectedTopics.length}</div>
               <div className="text-xs text-muted-foreground mt-1">Topics</div>
             </div>
             <div className="text-center p-4 bg-background rounded-xl border border-border">
-              <div className={`text-2xl font-bold ${isPassed ? 'text-emerald-500' : 'text-red-500'}`}>
-                {isPassed ? 'PASS' : 'FAIL'}
+              <div
+                className={`text-2xl font-bold ${isPassed ? "text-emerald-500" : "text-red-500"}`}
+              >
+                {isPassed ? "PASS" : "FAIL"}
               </div>
               <div className="text-xs text-muted-foreground mt-1">Result</div>
             </div>
@@ -590,18 +599,18 @@ export function McqTest() {
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 p-4 md:p-6 border-t border-border">
-            <Button 
-              onClick={handleRetry} 
+            <Button
+              onClick={handleRetry}
               size="lg"
               className="rounded-xl px-8 gap-2 bg-yellow-600 hover:bg-yellow-700 text-white"
             >
               <ClipboardList className="w-5 h-5" />
               Try Again
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="lg"
-              onClick={() => window.location.href = '/dashboard'}
+              onClick={() => (window.location.href = "/dashboard")}
               className="rounded-xl px-8 border-2"
             >
               Back to Dashboard
@@ -634,21 +643,25 @@ export function McqTest() {
                 <div
                   key={q.id}
                   className={`bg-background rounded-2xl border-2 overflow-hidden transition-all duration-300 hover:shadow-lg ${
-                    isCorrect 
-                      ? "border-emerald-500/30 hover:border-emerald-500/50" 
+                    isCorrect
+                      ? "border-emerald-500/30 hover:border-emerald-500/50"
                       : "border-red-500/30 hover:border-red-500/50"
                   }`}
                 >
                   {/* Question Header */}
-                  <div className={`p-4 flex items-center justify-between ${
-                    isCorrect ? "bg-emerald-500/5" : "bg-red-500/5"
-                  }`}>
+                  <div
+                    className={`p-4 flex items-center justify-between ${
+                      isCorrect ? "bg-emerald-500/5" : "bg-red-500/5"
+                    }`}
+                  >
                     <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold ${
-                        isCorrect 
-                          ? "bg-emerald-500/20 text-emerald-700" 
-                          : "bg-red-500/20 text-red-700"
-                      }`}>
+                      <div
+                        className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold ${
+                          isCorrect
+                            ? "bg-emerald-500/20 text-emerald-700"
+                            : "bg-red-500/20 text-red-700"
+                        }`}
+                      >
                         {idx + 1}
                       </div>
                       <div className="flex items-center gap-2">
@@ -657,11 +670,13 @@ export function McqTest() {
                         </span>
                       </div>
                     </div>
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold ${
-                      isCorrect
-                        ? "bg-emerald-500/20 text-emerald-700"
-                        : "bg-red-500/20 text-red-700"
-                    }`}>
+                    <div
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold ${
+                        isCorrect
+                          ? "bg-emerald-500/20 text-emerald-700"
+                          : "bg-red-500/20 text-red-700"
+                      }`}
+                    >
                       {isCorrect ? (
                         <>
                           <CheckCircle className="w-5 h-5" />
@@ -729,6 +744,5 @@ export function McqTest() {
         </div>
       </div>
     </div>
-          
   );
 }
